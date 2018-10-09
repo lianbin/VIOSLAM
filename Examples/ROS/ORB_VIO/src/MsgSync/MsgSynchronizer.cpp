@@ -168,6 +168,7 @@ void MsgSynchronizer::addImuMsg(const sensor_msgs::ImuConstPtr &imumsg)
 
 }
 
+//图像回调函数
 void MsgSynchronizer::addImageMsg(const sensor_msgs::ImageConstPtr &imgmsg)
 {
     unique_lock<mutex> lock(_mutexImageQueue);
@@ -208,7 +209,7 @@ void MsgSynchronizer::addImageMsg(const sensor_msgs::ImageConstPtr &imgmsg)
     if(ORB_SLAM2::ConfigParam::GetRealTimeFlag())
     {
         // Ignore earlier frames
-        if(_imageMsgQueue.size()>2)
+        if(_imageMsgQueue.size()>2)//队列中只保留两个图像帧
             _imageMsgQueue.pop();
     }
 }

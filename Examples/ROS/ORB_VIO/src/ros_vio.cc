@@ -196,15 +196,16 @@ int main(int argc, char **argv)
         ROS_WARN("Run realtime");
         while(ros::ok())
         {
-            bool bdata = msgsync.getRecentMsgs(imageMsg,vimuMsg);
+            bool bdata = msgsync.getRecentMsgs(imageMsg,vimuMsg);//获取imu数据与图像数据
 
             if(bdata)
             {
                 std::vector<ORB_SLAM2::IMUData> vimuData;
                 //ROS_INFO("image time: %.3f",imageMsg->header.stamp.toSec());
-                for(unsigned int i=0;i<vimuMsg.size();i++)
+                for(unsigned int i=0;i<vimuMsg.size();i++)//IMU数据
                 {
                     sensor_msgs::ImuConstPtr imuMsg = vimuMsg[i];
+					//加速度
                     double ax = imuMsg->linear_acceleration.x;
                     double ay = imuMsg->linear_acceleration.y;
                     double az = imuMsg->linear_acceleration.z;
@@ -214,6 +215,7 @@ int main(int argc, char **argv)
                         ay *= g3dm;
                         az *= g3dm;
                     }
+					//IMU数据 加速度与角速度
                     ORB_SLAM2::IMUData imudata(imuMsg->angular_velocity.x,imuMsg->angular_velocity.y,imuMsg->angular_velocity.z,
                                     ax,ay,az,imuMsg->header.stamp.toSec());
                     vimuData.push_back(imudata);

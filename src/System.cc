@@ -98,6 +98,7 @@ void System::SaveKeyFrameTrajectoryNavState(const string &filename)
     cout << endl << "NavState trajectory saved!" << endl;
 }
 
+
 cv::Mat System::TrackMonoVI(const cv::Mat &im, const std::vector<IMUData> &vimu, const double &timestamp)
 {
     if(mSensor!=MONOCULAR)
@@ -194,7 +195,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     }
     cout << "Vocabulary loaded!" << endl << endl;
 
-    ConfigParam config(strSettingsFile);
+    ConfigParam config(strSettingsFile);//imu与camera数据的topic.以及imu与相机的变换矩阵
 
     //Create KeyFrame Database
     mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
