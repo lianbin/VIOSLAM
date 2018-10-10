@@ -218,9 +218,12 @@ void KeyFrame::ComputePreInt(void)
         // IMU pre-integration integrates IMU data from last to current, but the bias is from last
         Vector3d bg = mpPrevKeyFrame->GetNavState().Get_BiasGyr();
         Vector3d ba = mpPrevKeyFrame->GetNavState().Get_BiasAcc();
-
+        std::cout <<"bg   "<<bg<<std::endl;
+		
+        std::cout <<"ba   "<<ba<<std::endl;
         // remember to consider the gap between the last KF and the first IMU
         {
+            //注意这里计算的是从上一个关键帧，当前的第一个IMU数据之间的时间差内的积分
             const IMUData& imu = mvIMUData.front();
             double dt = imu._t - mpPrevKeyFrame->mTimeStamp;
             mIMUPreInt.update(imu._g - bg,imu._a - ba,dt);

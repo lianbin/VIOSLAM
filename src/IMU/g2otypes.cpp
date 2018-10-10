@@ -1460,7 +1460,7 @@ void EdgeGyrBias::computeError()
     Vector3d bg = v->estimate();
     Matrix3d dRbg = Sophus::SO3::exp(J_dR_bg * bg).matrix();
     Sophus::SO3 errR ( ( dRbij * dRbg ).transpose() * Rwbi.transpose() * Rwbj ); // dRij^T * Riw * Rwj
-    _error = errR.log();
+    _error = errR.log();//取对数
     // Debug log
     //std::cout<<"dRbg: "<<std::endl<<dRbg<<std::endl;
     //std::cout<<"error: "<<_error.transpose()<<std::endl;
@@ -1473,7 +1473,7 @@ void EdgeGyrBias::linearizeOplus()
     Sophus::SO3 errR ( dRbij.transpose() * Rwbi.transpose() * Rwbj ); // dRij^T * Riw * Rwj
     Matrix3d Jlinv = Sophus::SO3::JacobianLInv(errR.log());
 
-    _jacobianOplusXi = - Jlinv * J_dR_bg;
+    _jacobianOplusXi = - Jlinv * J_dR_bg;//感觉这里是不对的
 
     // Debug log
     //std::cout<<"jacobian to bg:"<<std::endl<<_jacobianOplusXi<<std::endl;

@@ -242,7 +242,7 @@ bool LocalMapping::TryInitVIO(void)
     // Use all KeyFrames in map to compute
     vector<KeyFrame*> vScaleGravityKF = mpMap->GetAllKeyFrames();
     int N = vScaleGravityKF.size();
-    KeyFrame* pNewestKF = vScaleGravityKF[N-1];
+    KeyFrame* pNewestKF = vScaleGravityKF[N-1];//最新的一帧
     vector<cv::Mat> vTwc;
     vector<IMUPreintegrator> vIMUPreInt;
     // Store initialization-required KeyFrame data
@@ -271,11 +271,11 @@ bool LocalMapping::TryInitVIO(void)
     // Update biasg and pre-integration in LocalWindow. Remember to reset back to zero
     for(int i=0;i<N;i++)
     {
-        vKFInit[i]->bg = bgest;
+        vKFInit[i]->bg = bgest;//更新bg
     }
     for(int i=0;i<N;i++)
     {
-        vKFInit[i]->ComputePreInt();
+        vKFInit[i]->ComputePreInt();//重新进行预积分计算
     }
 
     // Solve A*x=B for x=[s,gw] 4x1 vector
@@ -350,11 +350,11 @@ bool LocalMapping::TryInitVIO(void)
         winv.at<float>(i,i) = 1./w.at<float>(i);
     }
     // Then x = vt'*winv*u'*B
-    cv::Mat x = vt.t()*winv*u.t()*B;
+    cv::Mat x = vt.t()*winv*u.t()*B;//使用SVD分解的方法求解Ax=b的方程组
 
     // x=[s,gw] 4x1 vector
-    double sstar = x.at<float>(0);    // scale should be positive
-    cv::Mat gwstar = x.rowRange(1,4);   // gravity should be about ~9.8
+    double sstar = x.at<float>(0);    // scale should be positive 尺度
+    cv::Mat gwstar = x.rowRange(1,4);   // gravity should be about ~9.8 //重力方向
 
     // Debug log
     //cout<<"scale sstar: "<<sstar<<endl;
@@ -378,7 +378,7 @@ bool LocalMapping::TryInitVIO(void)
     cv::Mat gIxgwn = gI.cross(gwn);
     double normgIxgwn = cv::norm(gIxgwn);
     cv::Mat vhat = gIxgwn/normgIxgwn;
-    double theta = std::atan2(normgIxgwn,gI.dot(gwn));
+    double theta = std::atan2(normgIxgwn,gI.dot(gwn));//论文公式14
     // Debug log
     //cout<<"vhat: "<<vhat<<", theta: "<<theta*180.0/M_PI<<endl;
 
@@ -461,9 +461,9 @@ bool LocalMapping::TryInitVIO(void)
     // Then y = vt'*winv*u'*D
     cv::Mat y = vt2.t()*w2inv*u2.t()*D;
 
-    double s_ = y.at<float>(0);
-    cv::Mat dthetaxy = y.rowRange(1,3);
-    cv::Mat dbiasa_ = y.rowRange(3,6);
+    double s_ = y.at<float>(0);//尺度
+    cv::Mat dthetaxy = y.rowRange(1,3); //重力方向偏差
+    cv::Mat dbiasa_ = y.rowRange(3,6);  //加速度计的随机游走
     Vector3d dbiasa_eig = Converter::toVector3d(dbiasa_);
 
     // dtheta = [dx;dy;0]
@@ -477,7 +477,7 @@ bool LocalMapping::TryInitVIO(void)
 
     // Debug log
     {
-        cv::Mat gwbefore = Rwi*GI;
+        cv::Mat gwbefore = Rwi*GI; //更新gw
         cv::Mat gwafter = Rwi_*GI;
         cout<<"Time: "<<mpCurrentKeyFrame->mTimeStamp - mnStartTime<<", sstar: "<<sstar<<", s: "<<s_<<endl;
 

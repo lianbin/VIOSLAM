@@ -82,13 +82,14 @@ void IMUPreintegrator::update(const Vector3d& omega, const Vector3d& acc, const 
 {
     double dt2 = dt*dt;
 
-    Matrix3d dR = Expmap(omega*dt);
+    Matrix3d dR = Expmap(omega*dt);//指数映射 
     Matrix3d Jr = JacobianR(omega*dt);
 
+    //噪声的协方差传递
     // noise covariance propagation of delta measurements
     // err_k+1 = A*err_k + B*err_gyro + C*err_acc
     Matrix3d I3x3 = Matrix3d::Identity();
-    Matrix<double,9,9> A = Matrix<double,9,9>::Identity();
+    Matrix<double,9,9> A = Matrix<double,9,9>::Identity();//协方差矩阵为9*9
     A.block<3,3>(6,6) = dR.transpose();
     A.block<3,3>(3,6) = -_delta_R*skew(acc)*dt;
     A.block<3,3>(0,6) = -0.5*_delta_R*skew(acc)*dt2;
@@ -98,19 +99,19 @@ void IMUPreintegrator::update(const Vector3d& omega, const Vector3d& acc, const 
     Matrix<double,9,3> Ca = Matrix<double,9,3>::Zero();
     Ca.block<3,3>(3,0) = _delta_R*dt;
     Ca.block<3,3>(0,0) = 0.5*_delta_R*dt2;
-    _cov_P_V_Phi = A*_cov_P_V_Phi*A.transpose() +
+    _cov_P_V_Phi = A*_cov_P_V_Phi*A.transpose() + 
         Bg*IMUData::getGyrMeasCov()*Bg.transpose() +
         Ca*IMUData::getAccMeasCov()*Ca.transpose();
 
-
+    //测量对随机游走的雅克比矩阵
     // jacobian of delta measurements w.r.t bias of gyro/acc
     // update P first, then V, then R
     _J_P_Biasa += _J_V_Biasa*dt - 0.5*_delta_R*dt2;
     _J_P_Biasg += _J_V_Biasg*dt - 0.5*_delta_R*skew(acc)*_J_R_Biasg*dt2;
     _J_V_Biasa += -_delta_R*dt;
     _J_V_Biasg += -_delta_R*skew(acc)*_J_R_Biasg*dt;
-    _J_R_Biasg = dR.transpose()*_J_R_Biasg - Jr*dt;
-
+    _J_R_Biasg = dR.transpose()*_J_R_Biasg - Jr*dt;//？？？这句没看懂
+    //测量公式
     // delta measurements, position/velocity/rotation(matrix)
     // update P first, then V, then R. because P's update need V&R's previous state
     _delta_P += _delta_V*dt + 0.5*_delta_R*acc*dt2;    // P_k+1 = P_k + V_k*dt + R_k*a_k*dt*dt/2

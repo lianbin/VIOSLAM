@@ -88,12 +88,12 @@ public:
     {
         return SO3::exp(v).matrix();
     }
-    
+    //求w的右雅克比
     // right jacobian of SO(3)
     static Matrix3d JacobianR(const Vector3d& w)
     {
         Matrix3d Jr = Matrix3d::Identity();
-        double theta = w.norm();
+        double theta = w.norm();//向量的模
         if(theta<0.00001)
         {
             return Jr;// = Matrix3d::Identity();

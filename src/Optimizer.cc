@@ -2938,7 +2938,7 @@ Vector3d Optimizer::OptimizeInitialGyroBias(const vector<cv::Mat>& vTwc, const v
 
     // Add vertex of gyro bias, to optimizer graph
     g2o::VertexGyrBias * vBiasg = new g2o::VertexGyrBias();
-    vBiasg->setEstimate(Eigen::Vector3d::Zero());
+    vBiasg->setEstimate(Eigen::Vector3d::Zero());//给初始的估计值
     vBiasg->setId(0);
     optimizer.addVertex(vBiasg);
 

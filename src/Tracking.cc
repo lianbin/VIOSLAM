@@ -750,7 +750,7 @@ void Tracking::Track()
         bMapUpdated = true;
     }
 
-
+    
     if(mState==NOT_INITIALIZED)
     {
         if(mSensor==System::STEREO || mSensor==System::RGBD)
@@ -765,6 +765,7 @@ void Tracking::Track()
     }
     else
     {
+        std::cout <<"9999999999999999999999999999999999999"<<std::endl;
         // System is initialized. Track Frame.
         bool bOK;
 
@@ -780,7 +781,7 @@ void Tracking::Track()
                 CheckReplacedInLastFrame();
 #ifdef TRACK_WITH_IMU
                 // If Visual-Inertial is initialized
-                if(mpLocalMapper->GetVINSInited())
+                if(mpLocalMapper->GetVINSInited())//IMU已经初始化
                 {
                     // 20 Frames after reloc, track with only vision
                     if(mbRelocBiasPrepare)
@@ -1063,8 +1064,10 @@ void Tracking::MonocularInitialization()
 
     if(!mpInitializer)
     {
+        
+	    std::cout <<"66666666666666666666666666"<<std::endl;
         // Clear imu data
-        mvIMUSinceLastKF.clear();
+        mvIMUSinceLastKF.clear();//清除第一个有效帧之前的所有IMU数据
 
         // Set Reference Frame
         if(mCurrentFrame.mvKeys.size()>100)
@@ -1087,6 +1090,8 @@ void Tracking::MonocularInitialization()
     }
     else
     {
+        
+	    std::cout <<"777777777777777777777777777777"<<std::endl;
         // Try to initialize
         if((int)mCurrentFrame.mvKeys.size()<=100)
         {
@@ -1107,6 +1112,7 @@ void Tracking::MonocularInitialization()
             mpInitializer = static_cast<Initializer*>(NULL);
             return;
         }
+	    std::cout <<"4444444444444444444444444444444444444"<<std::endl;
 
         cv::Mat Rcw; // Current Camera Rotation
         cv::Mat tcw; // Current Camera Translation
@@ -1114,6 +1120,8 @@ void Tracking::MonocularInitialization()
 
         if(mpInitializer->Initialize(mCurrentFrame, mvIniMatches, Rcw, tcw, mvIniP3D, vbTriangulated))
         {
+           
+	        std::cout <<"222222222222222222222222222222222222222"<<std::endl;
             for(size_t i=0, iend=mvIniMatches.size(); i<iend;i++)
             {
                 if(mvIniMatches[i]>=0 && !vbTriangulated[i])
@@ -1147,13 +1155,17 @@ void Tracking::CreateInitialMapMonocular()
         else
             vimu2.push_back(imu);
     }
-
+    std::cout <<"vimu1.size "<<vimu1.size() <<std::endl;
+	
+    std::cout <<"vimu2.size "<<vimu2.size() <<std::endl;
     // Create KeyFrames
     KeyFrame* pKFini = new KeyFrame(mInitialFrame,mpMap,mpKeyFrameDB,vimu1,NULL);
     pKFini->ComputePreInt();
     KeyFrame* pKFcur = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB,vimu2,pKFini);
-    pKFcur->ComputePreInt();
+	//预积分计算
+	pKFcur->ComputePreInt();
     // Clear IMUData buffer
+    //清零IMU数据
     mvIMUSinceLastKF.clear();
 
     pKFini->ComputeBoW();

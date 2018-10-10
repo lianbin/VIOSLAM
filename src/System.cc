@@ -237,7 +237,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mpLoopCloser->SetTracker(mpTracker);
     mpLoopCloser->SetLocalMapper(mpLocalMapper);
 
-    if(ConfigParam::GetRealTimeFlag())
+    if(ConfigParam::GetRealTimeFlag())//IMU初始化线程
     {
         //Thread for VINS initialization
         mptLocalMappingVIOInit = new thread(&ORB_SLAM2::LocalMapping::VINSInitThread,mpLocalMapper);
