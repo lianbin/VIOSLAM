@@ -514,6 +514,7 @@ bool LocalMapping::TryInitVIO(void)
         mbFirstTry = false;
         mnStartTime = mpCurrentKeyFrame->mTimeStamp;
     }
+	//？？？？？？？？
     if(pNewestKF->mTimeStamp - mnStartTime >= ConfigParam::GetVINSInitTime())
     {
         bVIOInited = true;
@@ -524,9 +525,9 @@ bool LocalMapping::TryInitVIO(void)
         // Set NavState , scale and bias for all KeyFrames
         // Scale
         double scale = s_;
-        mnVINSInitScale = s_;
+        mnVINSInitScale = s_;//尺度
         // gravity vector in world frame
-        cv::Mat gw = Rwi_*GI;
+        cv::Mat gw = Rwi_*GI;//重力方向
         mGravityVec = gw.clone();
         Vector3d gweig = Converter::toVector3d(gw);
         mRwiInit = Rwi_.clone();
@@ -548,7 +549,7 @@ bool LocalMapping::TryInitVIO(void)
         SetUpdatingInitPoses(true);
         {
             unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
-
+            //所有当前localMap中存在的关键帧
             int cnt=0;
             for(vector<KeyFrame*>::const_iterator vit=vScaleGravityKF.begin(), vend=vScaleGravityKF.end(); vit!=vend; vit++,cnt++)
             {
@@ -559,15 +560,16 @@ bool LocalMapping::TryInitVIO(void)
                 cv::Mat wPc = pKF->GetPoseInverse().rowRange(0,3).col(3);                   // wPc
                 cv::Mat Rwc = pKF->GetPoseInverse().rowRange(0,3).colRange(0,3);            // Rwc
                 // Set position and rotation of navstate
-                cv::Mat wPb = scale*wPc + Rwc*pcb;
+                cv::Mat wPb = scale*wPc + Rwc*pcb;//现在尺度是已知的
+                //设置惯导导航状态
                 pKF->SetNavStatePos(Converter::toVector3d(wPb));
                 pKF->SetNavStateRot(Converter::toMatrix3d(Rwc*Rcb));
                 // Update bias of Gyr & Acc
-                pKF->SetNavStateBiasGyr(bgest);
-                pKF->SetNavStateBiasAcc(dbiasa_eig);
+                pKF->SetNavStateBiasGyr(bgest);//角速度传感器初始偏置
+                pKF->SetNavStateBiasAcc(dbiasa_eig);////加速度计的初始随机游走
                 // Set delta_bias to zero. (only updated during optimization)
-                pKF->SetNavStateDeltaBg(Eigen::Vector3d::Zero());
-                pKF->SetNavStateDeltaBa(Eigen::Vector3d::Zero());
+                pKF->SetNavStateDeltaBg(Eigen::Vector3d::Zero());//随机游走的增量
+                pKF->SetNavStateDeltaBa(Eigen::Vector3d::Zero());//随机游走的增量
                 // Step 4.
                 // compute velocity
                 if(pKF != vScaleGravityKF.back())
@@ -583,12 +585,12 @@ bool LocalMapping::TryInitVIO(void)
                     cv::Mat Jpba = Converter::toCvMat(imupreint.getJPBiasa());    // J_deltaP_biasa
                     cv::Mat wPcnext = pKFnext->GetPoseInverse().rowRange(0,3).col(3);           // wPc next
                     cv::Mat Rwcnext = pKFnext->GetPoseInverse().rowRange(0,3).colRange(0,3);    // Rwc next
-
+                    //对照论文的公式18 ，少了带有delataθ的那一项
                     cv::Mat vel = - 1./dt*( scale*(wPc - wPcnext) + (Rwc - Rwcnext)*pcb + Rwc*Rcb*(dp + Jpba*dbiasa_) + 0.5*gw*dt*dt );
                     Eigen::Vector3d veleig = Converter::toVector3d(vel);
                     pKF->SetNavStateVel(veleig);
                 }
-                else
+                else//最新的一帧 使用论文中公式3运算
                 {
                     cerr<<"-----------here is the last KF in vScaleGravityKF------------"<<endl;
                     // If this is the last KeyFrame, no 'next' KeyFrame exists
@@ -606,7 +608,7 @@ bool LocalMapping::TryInitVIO(void)
                     pKF->SetNavStateVel(veleig);
                 }
             }
-
+            //得到随机游走参数之后，重新进行预积分的计算
             // Re-compute IMU pre-integration at last. Should after usage of pre-int measurements.
             for(vector<KeyFrame*>::const_iterator vit=vScaleGravityKF.begin(), vend=vScaleGravityKF.end(); vit!=vend; vit++)
             {
@@ -616,21 +618,23 @@ bool LocalMapping::TryInitVIO(void)
             }
 
             // Update poses (multiply metric scale)
+            //这里更新的是localMap中的所有帧
             vector<KeyFrame*> mspKeyFrames = mpMap->GetAllKeyFrames();
             for(std::vector<KeyFrame*>::iterator sit=mspKeyFrames.begin(), send=mspKeyFrames.end(); sit!=send; sit++)
             {
                 KeyFrame* pKF = *sit;
                 cv::Mat Tcw = pKF->GetPose();
-                cv::Mat tcw = Tcw.rowRange(0,3).col(3)*scale;
+                cv::Mat tcw = Tcw.rowRange(0,3).col(3)*scale;//更新关键帧的轨迹的尺度
                 tcw.copyTo(Tcw.rowRange(0,3).col(3));
                 pKF->SetPose(Tcw);
             }
+			//地图中的MapPoint
             vector<MapPoint*> mspMapPoints = mpMap->GetAllMapPoints();
             for(std::vector<MapPoint*>::iterator sit=mspMapPoints.begin(), send=mspMapPoints.end(); sit!=send; sit++)
             {
                 MapPoint* pMP = *sit;
                 //pMP->SetWorldPos(pMP->GetWorldPos()*scale);
-                pMP->UpdateScale(scale);
+                pMP->UpdateScale(scale);//更新MapPoint的尺度
             }
             std::cout<<std::endl<<"... Map scale updated ..."<<std::endl<<std::endl;
 
@@ -673,7 +677,7 @@ bool LocalMapping::TryInitVIO(void)
                     cv::Mat wPc = pKF->GetPoseInverse().rowRange(0,3).col(3);                   // wPc
                     cv::Mat Rwc = pKF->GetPoseInverse().rowRange(0,3).colRange(0,3);            // Rwc
                     cv::Mat wPb = wPc + Rwc*pcb;
-                    pKF->SetNavStatePos(Converter::toVector3d(wPb));
+                    pKF->SetNavStatePos(Converter::toVector3d(wPb));//更新导航状态
                     pKF->SetNavStateRot(Converter::toMatrix3d(Rwc*Rcb));
 
                     //pKF->SetNavState();
@@ -689,7 +693,7 @@ bool LocalMapping::TryInitVIO(void)
                         cv::Mat Jpba = Converter::toCvMat(imupreint.getJPBiasa());    // J_deltaP_biasa
                         cv::Mat wPcnext = pKFnext->GetPoseInverse().rowRange(0,3).col(3);           // wPc next
                         cv::Mat Rwcnext = pKFnext->GetPoseInverse().rowRange(0,3).colRange(0,3);    // Rwc next
-
+                        //计算速度
                         cv::Mat vel = - 1./dt*( (wPc - wPcnext) + (Rwc - Rwcnext)*pcb + Rwc*Rcb*(dp + Jpba*dbiasa_) + 0.5*gw*dt*dt );
                         Eigen::Vector3d veleig = Converter::toVector3d(vel);
                         pKF->SetNavStateVel(veleig);

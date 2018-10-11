@@ -507,6 +507,7 @@ void EdgeNavStatePriorPRVBias::linearizeOplus()
     _jacobianOplus[2] = _jacobianOplusBias;
 }
 
+//残差计算，见预积分总结与公式推导 计算三项残差
 void EdgeNavStatePVR::computeError()
 {
     //
@@ -534,10 +535,11 @@ void EdgeNavStatePVR::computeError()
     const IMUPreintegrator& M = _measurement;
     double dTij = M.getDeltaTime();   // Delta Time
     double dT2 = dTij*dTij;
+	//预积分的测量值
     Vector3d dPij = M.getDeltaP();    // Delta Position pre-integration measurement
     Vector3d dVij = M.getDeltaV();    // Delta Velocity pre-integration measurement
     Sophus::SO3 dRij = Sophus::SO3(M.getDeltaR());  // Delta Rotation pre-integration measurement
-
+    //残差公式
     // tmp variable, transpose of Ri
     Sophus::SO3 RiT = Ri.inverse();
     // residual error of Delta Position measurement
@@ -551,7 +553,7 @@ void EdgeNavStatePVR::computeError()
     Sophus::SO3 rRij = (dRij * dR_dbg).inverse() * RiT * Rj;
     Vector3d rPhiij = rRij.log();
 
-
+    //残差向量
     Vector9d err;  // typedef Matrix<double, D, 1> ErrorVector; ErrorVector _error; D=9
     err.setZero();
 
@@ -574,6 +576,7 @@ void EdgeNavStatePVR::computeError()
 
 }
 
+//每个残差项关于优化变量的雅克比矩阵
 void EdgeNavStatePVR::linearizeOplus()
 {
     //
@@ -910,6 +913,7 @@ void EdgeNavStatePriorPVRBias::linearizeOplus()
     //const NavState& nsPVRest = vPVR->estimate();
 
     _jacobianOplusXi = Matrix<double,15,9>::Zero();
+	//IMU误差对p的jacobian
     _jacobianOplusXi.block<3,3>(0,0) = - Matrix3d::Identity();//nsPVRest.Get_RotMatrix();
     _jacobianOplusXi.block<3,3>(3,3) = - Matrix3d::Identity();
     _jacobianOplusXi.block<3,3>(6,6) = Sophus::SO3::JacobianRInv( _error.segment<3>(6) );
