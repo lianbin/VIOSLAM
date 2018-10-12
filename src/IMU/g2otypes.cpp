@@ -646,7 +646,7 @@ void EdgeNavStatePVR::linearizeOplus()
 
     // 4.1
     // J_rPij_xxx_i for Vertex_PVR_i
-    JPVRi.block<3,3>(0,0) = - RiT;      //J_rP_dpi
+    JPVRi.block<3,3>(0,0) = - RiT;      //J_rP_dpi 这里同论文中的不一样，暂时不知道为什么？？？？
     JPVRi.block<3,3>(0,3) = - RiT*dTij;  //J_rP_dvi
     //JPVRi.block<3,3>(0,6) = SO3Calc::skew( RiT*(Pj-Pi-Vi*dTij-0.5*GravityVec*dT2)  );    //J_rP_dPhi_i
     JPVRi.block<3,3>(0,6) = Sophus::SO3::hat( RiT*(Pj-Pi-Vi*dTij-0.5*GravityVec*dT2)  );    //J_rP_dPhi_i
@@ -717,6 +717,7 @@ void EdgeNavStatePVR::linearizeOplus()
     _jacobianOplus[2] = JBiasi;
 }
 
+//
 void EdgeNavStateBias::computeError()
 {
     //

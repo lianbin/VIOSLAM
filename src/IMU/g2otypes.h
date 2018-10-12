@@ -417,6 +417,7 @@ protected:
     Vector3d GravityVec;
 };
 
+//随机游走的误差
 class EdgeNavStateBias : public BaseBinaryEdge<6, IMUPreintegrator, VertexNavStateBias, VertexNavStateBias>
 {
 public:
