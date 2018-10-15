@@ -82,7 +82,7 @@ void IMUPreintegrator::update(const Vector3d& omega, const Vector3d& acc, const 
 {
     double dt2 = dt*dt;
 
-    Matrix3d dR = Expmap(omega*dt);//指数映射 
+    Matrix3d dR = Expmap(omega*dt);//旋转的积分
     Matrix3d Jr = JacobianR(omega*dt);
 
     //噪声的协方差传递

@@ -765,7 +765,6 @@ void Tracking::Track()
     }
     else
     {
-        std::cout <<"9999999999999999999999999999999999999"<<std::endl;
         // System is initialized. Track Frame.
         bool bOK;
 
@@ -1065,7 +1064,6 @@ void Tracking::MonocularInitialization()
     if(!mpInitializer)
     {
         
-	    std::cout <<"66666666666666666666666666"<<std::endl;
         // Clear imu data
         mvIMUSinceLastKF.clear();//清除第一个有效帧之前的所有IMU数据
 
@@ -1091,7 +1089,6 @@ void Tracking::MonocularInitialization()
     else
     {
         
-	    std::cout <<"777777777777777777777777777777"<<std::endl;
         // Try to initialize
         if((int)mCurrentFrame.mvKeys.size()<=100)
         {
