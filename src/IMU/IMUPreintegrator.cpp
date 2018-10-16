@@ -91,7 +91,7 @@ void IMUPreintegrator::update(const Vector3d& omega, const Vector3d& acc, const 
     Matrix3d I3x3 = Matrix3d::Identity();
     Matrix<double,9,9> A = Matrix<double,9,9>::Identity();//协方差矩阵为9*9
     A.block<3,3>(6,6) = dR.transpose();
-    A.block<3,3>(3,6) = -_delta_R*skew(acc)*dt;
+    A.block<3,3>(3,6) = -_delta_R*skew(acc)*dt;//_delta_R的初始值为一个单位阵
     A.block<3,3>(0,6) = -0.5*_delta_R*skew(acc)*dt2;
     A.block<3,3>(0,3) = I3x3*dt;
     Matrix<double,9,3> Bg = Matrix<double,9,3>::Zero();
@@ -99,8 +99,9 @@ void IMUPreintegrator::update(const Vector3d& omega, const Vector3d& acc, const 
     Matrix<double,9,3> Ca = Matrix<double,9,3>::Zero();
     Ca.block<3,3>(3,0) = _delta_R*dt;
     Ca.block<3,3>(0,0) = 0.5*_delta_R*dt2;
+	//预计分公式47
     _cov_P_V_Phi = A*_cov_P_V_Phi*A.transpose() + 
-        Bg*IMUData::getGyrMeasCov()*Bg.transpose() +
+        Bg*IMUData::getGyrMeasCov()*Bg.transpose() + 
         Ca*IMUData::getAccMeasCov()*Ca.transpose();
 
     //测量对随机游走的雅克比矩阵
@@ -110,7 +111,8 @@ void IMUPreintegrator::update(const Vector3d& omega, const Vector3d& acc, const 
     _J_P_Biasg += _J_V_Biasg*dt - 0.5*_delta_R*skew(acc)*_J_R_Biasg*dt2;
     _J_V_Biasa += -_delta_R*dt;
     _J_V_Biasg += -_delta_R*skew(acc)*_J_R_Biasg*dt;
-    _J_R_Biasg = dR.transpose()*_J_R_Biasg - Jr*dt;//？？？这句没看懂
+	//看  deltaR对bg求偏导.jpg     的重新推导
+    _J_R_Biasg = dR.transpose()*_J_R_Biasg - Jr*dt;
     //测量公式
     // delta measurements, position/velocity/rotation(matrix)
     // update P first, then V, then R. because P's update need V&R's previous state
