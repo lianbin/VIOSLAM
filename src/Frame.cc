@@ -115,12 +115,20 @@ const NavState& Frame::GetNavState(void) const
     return mNavState;
 }
 
+//每个帧在计算预积分的时候，使用静态的(上一个关键帧的)bg，ba。
+//然后得到当前帧的IMU导航状态。
+//之后会进行优化，从而得到当前帧的随机游走的值。得到之后，并不会对预积分进行重新计算
+//而是用于下一帧。当计算下一帧的误差函数的时候会用到。正如
+//IMU推导中所说
+//“注意到，前面推导的预积分测量值关于bias 变化的修正在残差中进行了应用”
 void Frame::SetInitialNavStateAndBias(const NavState& ns)
 {
     mNavState = ns;
     // Set bias as bias+delta_bias, and reset the delta_bias term
+    //更新当前帧的bias
     mNavState.Set_BiasGyr(ns.Get_BiasGyr()+ns.Get_dBias_Gyr());
     mNavState.Set_BiasAcc(ns.Get_BiasAcc()+ns.Get_dBias_Acc());
+	//当前帧的偏置的增量设置为0(会在优化的时候得到)
     mNavState.Set_DeltaBiasGyr(Vector3d::Zero());
     mNavState.Set_DeltaBiasAcc(Vector3d::Zero());
 }

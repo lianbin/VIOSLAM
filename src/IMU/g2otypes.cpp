@@ -542,7 +542,7 @@ void EdgeNavStatePVR::computeError()
     Vector3d dPij = M.getDeltaP();    // Delta Position pre-integration measurement
     Vector3d dVij = M.getDeltaV();    // Delta Velocity pre-integration measurement
     Sophus::SO3 dRij = Sophus::SO3(M.getDeltaR());  // Delta Rotation pre-integration measurement
-    //残差公式
+    //残差公式，这里需要注意的是，
     // tmp variable, transpose of Ri
     Sophus::SO3 RiT = Ri.inverse();
     // residual error of Delta Position measurement
@@ -567,7 +567,7 @@ void EdgeNavStatePVR::computeError()
     err.segment<3>(3) = rVij;       // velocity error
     err.segment<3>(6) = rPhiij;     // rotation phi error
 
-    _error = err;
+    _error = err;//误差向量
 
     //Test log
     if( (NSPVRi.Get_BiasGyr()-NSBiasi.Get_BiasGyr()).norm()>1e-6 || (NSPVRi.Get_BiasAcc()-NSBiasi.Get_BiasAcc()).norm()>1e-6 )
@@ -588,12 +588,15 @@ void EdgeNavStatePVR::linearizeOplus()
     const VertexNavStateBias* vBiasi = static_cast<const VertexNavStateBias*>(_vertices[2]);
 
     // terms need to computer error in vertex i, except for bias error
+    //i时刻的状态
     const NavState& NSPVRi = vPVRi->estimate();
     Vector3d Pi = NSPVRi.Get_P();
     Vector3d Vi = NSPVRi.Get_V();
     Matrix3d Ri = NSPVRi.Get_RotMatrix();
     // bias
+    //i时刻的偏置
     const NavState& NSBiasi = vBiasi->estimate();
+	//i时刻的偏置的增量
     Vector3d dBgi = NSBiasi.Get_dBias_Gyr();
     //    Vector3d dBai = NSBiasi.Get_dBias_Acc();
 
