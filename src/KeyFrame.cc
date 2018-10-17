@@ -190,6 +190,8 @@ const IMUPreintegrator & KeyFrame::GetIMUPreInt(void)
     return mIMUPreInt;
 }
 
+
+//用于进行两个关键帧之间的预积分计算
 void KeyFrame::ComputePreInt(void)
 {
     unique_lock<mutex> lock(mMutexIMUData);
@@ -216,14 +218,13 @@ void KeyFrame::ComputePreInt(void)
         mIMUPreInt.reset();
 
         // IMU pre-integration integrates IMU data from last to current, but the bias is from last
+        //bg ba 使用的上一关键帧对应的的bg ba
         Vector3d bg = mpPrevKeyFrame->GetNavState().Get_BiasGyr();
         Vector3d ba = mpPrevKeyFrame->GetNavState().Get_BiasAcc();
-        std::cout <<"bg   "<<bg<<std::endl;
-		
-        std::cout <<"ba   "<<ba<<std::endl;
         // remember to consider the gap between the last KF and the first IMU
         {
             //注意这里计算的是从上一个关键帧，当前的第一个IMU数据之间的时间差内的积分
+            //这里假设这段时间内的imu的硬件测量值同第一个IMU数据相同
             const IMUData& imu = mvIMUData.front();
             double dt = imu._t - mpPrevKeyFrame->mTimeStamp;
             mIMUPreInt.update(imu._g - bg,imu._a - ba,dt);

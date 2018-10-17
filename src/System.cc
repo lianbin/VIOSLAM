@@ -99,6 +99,7 @@ void System::SaveKeyFrameTrajectoryNavState(const string &filename)
 }
 
 
+//给进来的timestamp是图像帧的时间戳
 cv::Mat System::TrackMonoVI(const cv::Mat &im, const std::vector<IMUData> &vimu, const double &timestamp)
 {
     if(mSensor!=MONOCULAR)

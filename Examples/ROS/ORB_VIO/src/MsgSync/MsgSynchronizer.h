@@ -45,9 +45,9 @@ public:
 private:
     double _imageMsgDelaySec;  // image message delay to imu message, in seconds
     std::mutex _mutexImageQueue;
-    std::queue<sensor_msgs::ImageConstPtr> _imageMsgQueue;
+    std::queue<sensor_msgs::ImageConstPtr> _imageMsgQueue;//队列，先进先出
     std::mutex _mutexIMUQueue;
-    std::queue<sensor_msgs::ImuConstPtr> _imuMsgQueue;
+    std::queue<sensor_msgs::ImuConstPtr> _imuMsgQueue;//队列，先进先出
     ros::Time _imuMsgTimeStart;
     Status _status;
     int _dataUnsyncCnt;

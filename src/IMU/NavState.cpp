@@ -5,7 +5,7 @@ namespace ORB_SLAM2
 
 NavState::NavState()
 {
-    //_qR.setIdentity();     // rotation
+    //_qR.setIdentity();  // rotation
     _P.setZero();         // position
     _V.setZero();         // velocity
 
@@ -82,6 +82,7 @@ void NavState::IncSmallV(Vector3d dV)
     _V += dV;
 }
 
+//PVR更新
 void NavState::IncSmallPVR(Vector9d updatePVR)
 {
     // Update P/V/R in NavState
@@ -104,7 +105,8 @@ void NavState::IncSmallPVR(Vector9d updatePVR)
     Matrix3d R = Get_R().matrix();
 
     // position
-    _P += upd_P;
+    _P += upd_P; //这里按照公式应该是_P += R * upd_P。在非RT版本中是按公式来的
+                 //不明白这里作者为什么要把R去掉
     // velocity
     _V += upd_V;
     // rotation
@@ -113,6 +115,7 @@ void NavState::IncSmallPVR(Vector9d updatePVR)
 
 }
 
+//bias更新
 void NavState::IncSmallBias(Vector6d updatedBias)
 {
     // Update bias in NavState

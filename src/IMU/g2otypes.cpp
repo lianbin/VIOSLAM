@@ -516,24 +516,27 @@ void EdgeNavStatePVR::computeError()
     const VertexNavStateBias* vBiasi = static_cast<const VertexNavStateBias*>(_vertices[2]);
 
     // terms need to computer error in vertex i, except for bias error
+    //i时刻的PVR
     const NavState& NSPVRi = vPVRi->estimate();
     Vector3d Pi = NSPVRi.Get_P();
     Vector3d Vi = NSPVRi.Get_V();
     Sophus::SO3 Ri = NSPVRi.Get_R();
     // Bias from the bias vertex
+    //i时刻的bias
     const NavState& NSBiasi = vBiasi->estimate();
     Vector3d dBgi = NSBiasi.Get_dBias_Gyr();
     Vector3d dBai = NSBiasi.Get_dBias_Acc();
-
+    
+    //j时刻的PVR
     // terms need to computer error in vertex j, except for bias error
     const NavState& NSPVRj = vPVRj->estimate();
     Vector3d Pj = NSPVRj.Get_P();
     Vector3d Vj = NSPVRj.Get_V();
     Sophus::SO3 Rj = NSPVRj.Get_R();
-
+    
     // IMU Preintegration measurement
-    const IMUPreintegrator& M = _measurement;
-    double dTij = M.getDeltaTime();   // Delta Time
+    const IMUPreintegrator& M = _measurement;//预积分的测量值
+    double dTij = M.getDeltaTime();   // Delta Time 预积分的两帧之间的时间差
     double dT2 = dTij*dTij;
 	//预积分的测量值
     Vector3d dPij = M.getDeltaP();    // Delta Position pre-integration measurement

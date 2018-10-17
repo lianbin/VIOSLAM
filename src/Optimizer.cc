@@ -2050,6 +2050,7 @@ int Optimizer::PoseOptimization(Frame *pFrame, Frame* pLastFrame, const IMUPrein
     return nInitialCorrespondences-nBad;
 }
 
+//当地图更新时的优化方法
 int Optimizer::PoseOptimization(Frame *pFrame, KeyFrame* pLastKF, const IMUPreintegrator& imupreint, const cv::Mat& gw, const bool& bComputeMarg)
 {
     // Extrinsics
@@ -2081,14 +2082,14 @@ int Optimizer::PoseOptimization(Frame *pFrame, KeyFrame* pLastKF, const IMUPrein
     // Set Frame vertex PVR/Bias
     g2o::VertexNavStatePVR * vNSFPVR = new g2o::VertexNavStatePVR();
     {
-        vNSFPVR->setEstimate(pFrame->GetNavState());
-        vNSFPVR->setId(FramePVRId);
-        vNSFPVR->setFixed(false);
+        vNSFPVR->setEstimate(pFrame->GetNavState());//PVR初始值
+        vNSFPVR->setId(FramePVRId); //顶点编号
+        vNSFPVR->setFixed(false);   //需要优化
         optimizer.addVertex(vNSFPVR);
     }
     g2o::VertexNavStateBias * vNSFBias = new g2o::VertexNavStateBias();
     {
-        vNSFBias->setEstimate(pFrame->GetNavState());
+        vNSFBias->setEstimate(pFrame->GetNavState());//初始值
         vNSFBias->setId(FrameBiasId);
         vNSFBias->setFixed(false);
         optimizer.addVertex(vNSFBias);
@@ -2099,29 +2100,30 @@ int Optimizer::PoseOptimization(Frame *pFrame, KeyFrame* pLastKF, const IMUPrein
     {
         vNSKFPVR->setEstimate(pLastKF->GetNavState());
         vNSKFPVR->setId(LastKFPVRId);
-        vNSKFPVR->setFixed(true);
+        vNSKFPVR->setFixed(true);//注意这里！！！，不优化关键帧的状态
         optimizer.addVertex(vNSKFPVR);
     }
     g2o::VertexNavStateBias * vNSKFBias = new g2o::VertexNavStateBias();
     {
         vNSKFBias->setEstimate(pLastKF->GetNavState());
         vNSKFBias->setId(LastKFBiasId);
-        vNSKFBias->setFixed(true);
+        vNSKFBias->setFixed(true);//注意这里！！！，不优化关键帧的状态
         optimizer.addVertex(vNSKFBias);
     }
 
     // Set PVR edge between LastKF-Frame
-    g2o::EdgeNavStatePVR* eNSPVR = new g2o::EdgeNavStatePVR();
+    g2o::EdgeNavStatePVR* eNSPVR = new g2o::EdgeNavStatePVR(); //PVR边
     {
         eNSPVR->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(LastKFPVRId)));
         eNSPVR->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(FramePVRId)));
         eNSPVR->setVertex(2, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(LastKFBiasId)));
-        eNSPVR->setMeasurement(imupreint);
-
+		//测量值就是预积分的值
+		eNSPVR->setMeasurement(imupreint);
+        //信息矩阵就是噪声的协方差矩阵的逆
         Matrix9d InvCovPVR = imupreint.getCovPVPhi().inverse() ;
         eNSPVR->setInformation(InvCovPVR);
 
-        eNSPVR->SetParams(GravityVec);
+        eNSPVR->SetParams(GravityVec);//输入重力参数
 
         const float thHuberNavStatePVR = sqrt(21.666);
         g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
@@ -2131,7 +2133,7 @@ int Optimizer::PoseOptimization(Frame *pFrame, KeyFrame* pLastKF, const IMUPrein
         optimizer.addEdge(eNSPVR);
     }
     // Set Bias edge between LastKF-Frame
-    g2o::EdgeNavStateBias* eNSBias = new g2o::EdgeNavStateBias();
+    g2o::EdgeNavStateBias* eNSBias = new g2o::EdgeNavStateBias();//Bias边
     {
         eNSBias->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(LastKFBiasId)));
         eNSBias->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(FrameBiasId)));

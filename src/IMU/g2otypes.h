@@ -391,6 +391,7 @@ public:
 
 };
 
+//pvr误差函数
 class EdgeNavStatePVR : public BaseMultiEdge<9, IMUPreintegrator>
 {
 public:

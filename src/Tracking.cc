@@ -295,14 +295,17 @@ void Tracking::PredictNavStateByIMU(bool bMapUpdated)
     if(mpLocalMapper->GetFirstVINSInited() || bMapUpdated)
     {
         //if(mpLocalMapper->GetFirstVINSInited() && !bMapUpdated) cerr<<"2-FirstVinsInit, but not bMapUpdated. shouldn't"<<endl;
-
+	    //从上一个关键帧到当前帧之间的IMU积分（测量值的预积分）
         // Compute IMU Pre-integration
         mIMUPreIntInTrack = GetIMUPreIntSinceLastKF(&mCurrentFrame, mpLastKeyFrame, mvIMUSinceLastKF);
 
         // Get initial NavState&pose from Last KeyFrame
+        //先将当前帧的导航状态初始化为上一帧的导航状态
         mCurrentFrame.SetInitialNavStateAndBias(mpLastKeyFrame->GetNavState());
+		//根据本次计算的预积分更新导航状态
         mCurrentFrame.UpdateNavState(mIMUPreIntInTrack,Converter::toVector3d(mpLocalMapper->GetGravityVec()));
-        mCurrentFrame.UpdatePoseFromNS(ConfigParam::GetMatTbc());
+        //根据IMU的导航状态，更新Tcw
+		mCurrentFrame.UpdatePoseFromNS(ConfigParam::GetMatTbc());
 
         // Test log
         // Updated KF by Local Mapping. Should be the same as mpLastKeyFrame
@@ -313,6 +316,7 @@ void Tracking::PredictNavStateByIMU(bool bMapUpdated)
     else
     {
         // Compute IMU Pre-integration
+        //计算前后两帧图像帧之间的预积分
         mIMUPreIntInTrack = GetIMUPreIntSinceLastFrame(&mCurrentFrame, &mLastFrame);
 
         // Get initial pose from Last Frame
@@ -326,6 +330,7 @@ void Tracking::PredictNavStateByIMU(bool bMapUpdated)
     }
 }
 
+//使用IMU进行tracking
 bool Tracking::TrackWithIMU(bool bMapUpdated)
 {
     ORBmatcher matcher(0.9,true);
@@ -359,6 +364,7 @@ bool Tracking::TrackWithIMU(bool bMapUpdated)
 
 
     // Pose optimization. false: no need to compute marginalized for current Frame
+    //根据是否更新地图采用不同的优化策略
     if(mpLocalMapper->GetFirstVINSInited() || bMapUpdated)
     {
         Optimizer::PoseOptimization(&mCurrentFrame,mpLastKeyFrame,mIMUPreIntInTrack,mpLocalMapper->GetGravityVec(),false);
@@ -400,19 +406,23 @@ bool Tracking::TrackWithIMU(bool bMapUpdated)
 }
 
 
+//从上一个关键帧到当前帧之间的IMU积分（测量值的预积分）
 IMUPreintegrator Tracking::GetIMUPreIntSinceLastKF(Frame* pCurF, KeyFrame* pLastKF, const std::vector<IMUData>& vIMUSInceLastKF)
 {
     // Reset pre-integrator first
     IMUPreintegrator IMUPreInt;
+	//首先清零预积分器
     IMUPreInt.reset();
-
+    //使用上一帧的bg ba
     Vector3d bg = pLastKF->GetNavState().Get_BiasGyr();
     Vector3d ba = pLastKF->GetNavState().Get_BiasAcc();
 
     // remember to consider the gap between the last KF and the first IMU
     {
+        //第一帧的IMU数据
         const IMUData& imu = vIMUSInceLastKF.front();
         double dt = imu._t - pLastKF->mTimeStamp;
+		//第一帧IMU与上一帧的时间戳时间的时间差
         IMUPreInt.update(imu._g - bg, imu._a - ba, dt);
 
         // Test log
@@ -422,6 +432,7 @@ IMUPreintegrator Tracking::GetIMUPreIntSinceLastKF(Frame* pCurF, KeyFrame* pLast
             std::cerr.unsetf ( std::ios::showbase );                // deactivate showbase
         }
     }
+	
     // integrate each imu
     for(size_t i=0; i<vIMUSInceLastKF.size(); i++)
     {
@@ -463,6 +474,7 @@ IMUPreintegrator Tracking::GetIMUPreIntSinceLastFrame(Frame* pCurF, Frame* pLast
 
 cv::Mat Tracking::GrabImageMonoVI(const cv::Mat &im, const std::vector<IMUData> &vimu, const double &timestamp)
 {
+    //存储KF之间的IMU数据
     mvIMUSinceLastKF.insert(mvIMUSinceLastKF.end(), vimu.begin(),vimu.end());
     mImGray = im;
 
@@ -734,6 +746,7 @@ void Tracking::Track()
     unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
 
     // Different operation, according to whether the map is updated
+    //这里，根据地图是否是刚刚完成更新，执行不同的操作
     bool bMapUpdated = false;
     if(mpLocalMapper->GetMapUpdateFlagForTracking())
     {
@@ -1109,8 +1122,6 @@ void Tracking::MonocularInitialization()
             mpInitializer = static_cast<Initializer*>(NULL);
             return;
         }
-	    std::cout <<"4444444444444444444444444444444444444"<<std::endl;
-
         cv::Mat Rcw; // Current Camera Rotation
         cv::Mat tcw; // Current Camera Translation
         vector<bool> vbTriangulated; // Triangulated Correspondences (mvIniMatches)
@@ -1118,7 +1129,6 @@ void Tracking::MonocularInitialization()
         if(mpInitializer->Initialize(mCurrentFrame, mvIniMatches, Rcw, tcw, mvIniP3D, vbTriangulated))
         {
            
-	        std::cout <<"222222222222222222222222222222222222222"<<std::endl;
             for(size_t i=0, iend=mvIniMatches.size(); i<iend;i++)
             {
                 if(mvIniMatches[i]>=0 && !vbTriangulated[i])
@@ -1162,7 +1172,7 @@ void Tracking::CreateInitialMapMonocular()
 	//预积分计算
 	pKFcur->ComputePreInt();
     // Clear IMUData buffer
-    //清零IMU数据
+    //清零两个关键帧之间的IMU数据
     mvIMUSinceLastKF.clear();
 
     pKFini->ComputeBoW();

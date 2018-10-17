@@ -43,8 +43,8 @@ bool MsgSynchronizer::getRecentMsgs(sensor_msgs::ImageConstPtr &imgmsg, std::vec
         sensor_msgs::ImuConstPtr bmsg;
 
         //
-        imsg = _imageMsgQueue.back();
-        bmsg = _imuMsgQueue.front();
+        imsg = _imageMsgQueue.back(); //最后一个image
+        bmsg = _imuMsgQueue.front();  //imu的第一个数据
 
         // Check dis-continuity, tolerance 3 seconds
         if(imsg->header.stamp.toSec()-_imageMsgDelaySec + 3.0 < bmsg->header.stamp.toSec() )
@@ -55,8 +55,8 @@ bool MsgSynchronizer::getRecentMsgs(sensor_msgs::ImageConstPtr &imgmsg, std::vec
         }
 
         //
-        imsg = _imageMsgQueue.front();
-        bmsg = _imuMsgQueue.back();
+        imsg = _imageMsgQueue.front();//第一个image
+        bmsg = _imuMsgQueue.back();   //最后一个imu
 
         // Wait imu messages in case communication block
         if(imsg->header.stamp.toSec()-_imageMsgDelaySec > bmsg->header.stamp.toSec())
@@ -73,6 +73,7 @@ bool MsgSynchronizer::getRecentMsgs(sensor_msgs::ImageConstPtr &imgmsg, std::vec
         }
 
         // Wait until the imu packages totolly com
+        // 注意这里 ，图像帧要大于10个 imu的帧数要大于15个
         if(_imageMsgQueue.size()<10 && _imuMsgQueue.size()<15
            && imsg->header.stamp.toSec()-_imageMsgDelaySec>bmsg->header.stamp.toSec() )
         {
@@ -84,8 +85,8 @@ bool MsgSynchronizer::getRecentMsgs(sensor_msgs::ImageConstPtr &imgmsg, std::vec
     }
 
     // get image message
-    imgmsg = _imageMsgQueue.front();
-    _imageMsgQueue.pop();
+    imgmsg = _imageMsgQueue.front();//拿到第一幅图像
+    _imageMsgQueue.pop();           //将第一幅图像pop出去
 
     // clear imu message vector, and push all imu messages whose timestamp is earlier than image message
     vimumsgs.clear();
@@ -97,6 +98,7 @@ bool MsgSynchronizer::getRecentMsgs(sensor_msgs::ImageConstPtr &imgmsg, std::vec
 
         // consider delay between image and imu serial
         sensor_msgs::ImuConstPtr tmpimumsg = _imuMsgQueue.front();
+		//将图像帧之前的IMU数据push到vimumsgs中
         if(tmpimumsg->header.stamp.toSec() < imgmsg->header.stamp.toSec() - _imageMsgDelaySec)
         {
             // add to imu message vector
@@ -124,7 +126,7 @@ bool MsgSynchronizer::getRecentMsgs(sensor_msgs::ImageConstPtr &imgmsg, std::vec
     }
 
     // the camera fps 20Hz, imu message 100Hz. so there should be not more than 5 imu messages between images
-    if(vimumsgs.size()>10)
+    if(vimumsgs.size()>10)//vimumsgs中存储的是两帧之间的IMU数据
         ROS_WARN("%lu imu messages between images, note",vimumsgs.size());
     if(vimumsgs.size()==0)
         ROS_ERROR("no imu message between images!");
@@ -175,12 +177,13 @@ void MsgSynchronizer::addImageMsg(const sensor_msgs::ImageConstPtr &imgmsg)
 
     if(_imageMsgDelaySec >= 0) {
         // if there's no imu messages, don't add image
-        if(_status == NOTINIT)
+        if(_status == NOTINIT)//如果还没有imu数据，则图像数据也不接收
             return;
         else if(_status == INIT)
         {
             // ignore all image messages with no imu messages between them
             // only add below images
+            //在获取到imu数据的时间点之前的图像，全都舍弃掉
             if(imgmsg->header.stamp.toSec() - _imageMsgDelaySec > _imuMsgTimeStart.toSec())
             {
                 _imageMsgQueue.push(imgmsg);

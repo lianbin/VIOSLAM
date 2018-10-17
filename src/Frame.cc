@@ -37,12 +37,12 @@ float Frame::mfGridElementWidthInv, Frame::mfGridElementHeightInv;
 //-------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------
-
+//计算前后两帧之间的IMU积分值
 void Frame::ComputeIMUPreIntSinceLastFrame(const Frame* pLastF, IMUPreintegrator& IMUPreInt) const
 {
     // Reset pre-integrator first
     IMUPreInt.reset();
-
+    //从上一帧到当前帧之间的IMU数据
     const std::vector<IMUData>& vIMUSInceLastFrame = mvIMUDataSinceLastFrame;
 
     Vector3d bg = pLastF->GetNavState().Get_BiasGyr();
@@ -85,6 +85,7 @@ void Frame::ComputeIMUPreIntSinceLastFrame(const Frame* pLastF, IMUPreintegrator
     }
 }
 
+//根据IMU的位姿，推算出摄像头的位姿
 void Frame::UpdatePoseFromNS(const cv::Mat &Tbc)
 {
     cv::Mat Rbc = Tbc.rowRange(0,3).colRange(0,3).clone();
@@ -146,7 +147,7 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, const std::vector<I
      mTimeStamp(timeStamp), mK(K.clone()),mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth)
 {
     // Copy IMU data
-    mvIMUDataSinceLastFrame = vimu;
+    mvIMUDataSinceLastFrame = vimu;//帧对应的IMU数据
 
     // Frame ID
     mnId=nNextId++;

@@ -209,7 +209,7 @@ int main(int argc, char **argv)
                     double ax = imuMsg->linear_acceleration.x;
                     double ay = imuMsg->linear_acceleration.y;
                     double az = imuMsg->linear_acceleration.z;
-                    if(bAccMultiply98)
+                    if(bAccMultiply98)//个人理解，如果加速度计给出的只是
                     {
                         ax *= g3dm;
                         ay *= g3dm;

@@ -26,21 +26,23 @@ namespace ORB_SLAM2
 
 void Converter::updateNS(NavState& ns, const IMUPreintegrator& imupreint, const Vector3d& gw)
 {
+    //预积分的测量值
     Matrix3d dR = imupreint.getDeltaR();
     Vector3d dP = imupreint.getDeltaP();
     Vector3d dV = imupreint.getDeltaV();
     double dt = imupreint.getDeltaTime();
-
+    //上一帧的导航状态值(因为使用上一帧的导航状态初始化的当前帧导航状态)
     Vector3d Pwbpre = ns.Get_P();
     Matrix3d Rwbpre = ns.Get_RotMatrix();
     Vector3d Vwbpre = ns.Get_V();
-
+    //导航状态更新 预积分推导公式 24
     Matrix3d Rwb = Rwbpre * dR;
     Vector3d Pwb = Pwbpre + Vwbpre*dt + 0.5*gw*dt*dt + Rwbpre*dP;
     Vector3d Vwb = Vwbpre + gw*dt + Rwbpre*dV;
 
     // Here assume that the pre-integration is re-computed after bias updated, so the bias term is ignored
-    ns.Set_Pos(Pwb);
+    //更新当前的导航状态
+	ns.Set_Pos(Pwb);
     ns.Set_Vel(Vwb);
     ns.Set_Rot(Rwb);
 
