@@ -604,6 +604,7 @@ bool LocalMapping::TryInitVIO(void)
                     //
                     Eigen::Vector3d velpre = pKFprev->GetNavState().Get_V();
                     Eigen::Matrix3d rotpre = pKFprev->GetNavState().Get_RotMatrix();
+					//这里同论文3进行比较，少了bg的一项
                     Eigen::Vector3d veleig = velpre + gweig*dt + rotpre*( dv + Jvba*dbiasa_eig );
                     pKF->SetNavStateVel(veleig);
                 }

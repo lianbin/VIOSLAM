@@ -2003,14 +2003,18 @@ int Optimizer::PoseOptimization(Frame *pFrame, Frame* pLastFrame, const IMUPrein
     //if(eNSPrior->chi2()>30.5779) cout<<"F-F Prior edge chi2:"<<eNSPrior->chi2()<<endl;
 
     // Recover optimized pose and return number of inliers
+    //优化后，当前帧的导航状态
     g2o::VertexNavStatePVR* vNSPVR_recov = static_cast<g2o::VertexNavStatePVR*>(optimizer.vertex(FramePVRId));
     const NavState& nsPVR_recov = vNSPVR_recov->estimate();
     g2o::VertexNavStateBias* vNSBias_recov = static_cast<g2o::VertexNavStateBias*>(optimizer.vertex(FrameBiasId));
     const NavState& nsBias_recov = vNSBias_recov->estimate();
     NavState ns_recov = nsPVR_recov;
+	//更新当前帧的delta bias
     ns_recov.Set_DeltaBiasGyr(nsBias_recov.Get_dBias_Gyr());
     ns_recov.Set_DeltaBiasAcc(nsBias_recov.Get_dBias_Acc());
+    //更新当前帧的PVR
     pFrame->SetNavState(ns_recov);
+	//更新当前帧的位姿
     pFrame->UpdatePoseFromNS(ConfigParam::GetMatTbc());
 
     // Compute marginalized Hessian H and B, H*x=B, H/B can be used as prior for next optimization in PoseOptimization
@@ -2100,7 +2104,7 @@ int Optimizer::PoseOptimization(Frame *pFrame, KeyFrame* pLastKF, const IMUPrein
     {
         vNSKFPVR->setEstimate(pLastKF->GetNavState());
         vNSKFPVR->setId(LastKFPVRId);
-        vNSKFPVR->setFixed(true);//注意这里！！！，不优化关键帧的状态
+        vNSKFPVR->setFixed(true); //注意这里！！！，不优化关键帧的状态
         optimizer.addVertex(vNSKFPVR);
     }
     g2o::VertexNavStateBias * vNSKFBias = new g2o::VertexNavStateBias();
@@ -2111,6 +2115,7 @@ int Optimizer::PoseOptimization(Frame *pFrame, KeyFrame* pLastKF, const IMUPrein
         optimizer.addVertex(vNSKFBias);
     }
 
+	//pvr误差的边，涉及到的定位为i时刻pvr ,j时刻pvr。i时刻的bias的增量
     // Set PVR edge between LastKF-Frame
     g2o::EdgeNavStatePVR* eNSPVR = new g2o::EdgeNavStatePVR(); //PVR边
     {
@@ -2133,6 +2138,7 @@ int Optimizer::PoseOptimization(Frame *pFrame, KeyFrame* pLastKF, const IMUPrein
         optimizer.addEdge(eNSPVR);
     }
     // Set Bias edge between LastKF-Frame
+    //bias边，涉及到i时刻的bias+增量 与 j时刻的bias+增量
     g2o::EdgeNavStateBias* eNSBias = new g2o::EdgeNavStateBias();//Bias边
     {
         eNSBias->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(LastKFBiasId)));
@@ -2165,7 +2171,7 @@ int Optimizer::PoseOptimization(Frame *pFrame, KeyFrame* pLastKF, const IMUPrein
     {
     unique_lock<mutex> lock(MapPoint::mGlobalMutex);
 
-    for(int i=0; i<N; i++)
+    for(int i=0; i<N; i++) //当前帧的重投影误差
     {
         MapPoint* pMP = pFrame->mvpMapPoints[i];
         if(pMP)
@@ -2274,14 +2280,19 @@ int Optimizer::PoseOptimization(Frame *pFrame, KeyFrame* pLastKF, const IMUPrein
     //if(eNSBias->chi2()>16.812) cout<<"KF-F Bias edge chi2:"<<eNSBias->chi2()<<endl;
 
     // Recover optimized pose and return number of inliers
+    //获取优化后的当前帧的pvr
     g2o::VertexNavStatePVR* vNSPVR_recov = static_cast<g2o::VertexNavStatePVR*>(optimizer.vertex(FramePVRId));
     const NavState& nsPVR_recov = vNSPVR_recov->estimate();
+	//获取优化后的当前帧的bias增量
     g2o::VertexNavStateBias* vNSBias_recov = static_cast<g2o::VertexNavStateBias*>(optimizer.vertex(FrameBiasId));
     const NavState& nsBias_recov = vNSBias_recov->estimate();
     NavState ns_recov = nsPVR_recov;
+	//!!!!!更新当前帧的bias增量
     ns_recov.Set_DeltaBiasGyr(nsBias_recov.Get_dBias_Gyr());
     ns_recov.Set_DeltaBiasAcc(nsBias_recov.Get_dBias_Acc());
+	//更新当前帧的导航状态
     pFrame->SetNavState(ns_recov);
+	//更新当前位姿
     pFrame->UpdatePoseFromNS(ConfigParam::GetMatTbc());
 
     // Compute marginalized Hessian H and B, H*x=B, H/B can be used as prior for next optimization in PoseOptimization

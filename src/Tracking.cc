@@ -857,7 +857,7 @@ void Tracking::Track()
                     }
                     else
                     {
-                        bOK = TrackLocalMapWithIMU(bMapUpdated);
+                        bOK = TrackLocalMapWithIMU(bMapUpdated);//使用IMU进行localMap的跟踪
                     }
                 }
 #endif
@@ -874,7 +874,7 @@ void Tracking::Track()
             mState = OK;
 
             // Add Frames to re-compute IMU bias after reloc
-            if(mbRelocBiasPrepare)
+            if(mbRelocBiasPrepare)//刚刚进行过重定位
             {
                 mv20FramesReloc.push_back(mCurrentFrame);
 

@@ -651,17 +651,23 @@ void EdgeNavStatePVR::linearizeOplus()
     JPVRi.setZero();
 
     // 4.1
-    // J_rPij_xxx_i for Vertex_PVR_i
+    // J_rPij_xxx_i for Vertex_PVR_i    
+    //deltap对pi的导数 ，在非RT分支中同论文一直等于-I3x3.
     JPVRi.block<3,3>(0,0) = - RiT;      //J_rP_dpi 这里同论文中的不一样，暂时不知道为什么？？？？
-    JPVRi.block<3,3>(0,3) = - RiT*dTij;  //J_rP_dvi
+    //deltap对vi的导数 
+	JPVRi.block<3,3>(0,3) = - RiT*dTij;  //J_rP_dvi
     //JPVRi.block<3,3>(0,6) = SO3Calc::skew( RiT*(Pj-Pi-Vi*dTij-0.5*GravityVec*dT2)  );    //J_rP_dPhi_i
-    JPVRi.block<3,3>(0,6) = Sophus::SO3::hat( RiT*(Pj-Pi-Vi*dTij-0.5*GravityVec*dT2)  );    //J_rP_dPhi_i
+    //deltap对φi的导数
+	JPVRi.block<3,3>(0,6) = Sophus::SO3::hat( RiT*(Pj-Pi-Vi*dTij-0.5*GravityVec*dT2)  );    //J_rP_dPhi_i
 
     // 4.2
     // J_rVij_xxx_i for Vertex_PVR_i
+    //deltav对pi的导数
     JPVRi.block<3,3>(3,0) = O3x3;    //dpi
+    //deltav对vi的导数
     JPVRi.block<3,3>(3,3) = - RiT;    //dvi
     //JPVRi.block<3,3>(3,6) = SO3Calc::skew( RiT*(Vj-Vi-GravityVec*dTij) );    //dphi_i
+    //deltav对φi的导数
     JPVRi.block<3,3>(3,6) = Sophus::SO3::hat( RiT*(Vj-Vi-GravityVec*dTij) );    //dphi_i
 
     // 4.3
@@ -670,8 +676,11 @@ void EdgeNavStatePVR::linearizeOplus()
     //Matrix3d JrBiasGCorr = SO3Calc::JacobianR(J_rPhi_dbg*dBgi);     //Jr( M.J_rPhi_bg * dBgi )
     Matrix3d ExprPhiijTrans = Sophus::SO3::exp(rPhiij).inverse().matrix();
     Matrix3d JrBiasGCorr = Sophus::SO3::JacobianR(J_rPhi_dbg*dBgi);
+	//deltaR对pi的导数
     JPVRi.block<3,3>(6,0) = O3x3;    //dpi
+    //deltaR对vi的导数
     JPVRi.block<3,3>(6,3) = O3x3;    //dvi
+    //deltaR对φi的导数
     JPVRi.block<3,3>(6,6) = - JrInv_rPhi * RjT * Ri;    //dphi_i
 
 
@@ -682,6 +691,7 @@ void EdgeNavStatePVR::linearizeOplus()
 
     // 5.1
     // J_rPij_xxx_j for Vertex_PVR_j
+    //deltap对pj的导数,非RT版本的同论文一致等于RiTRj。这里也是不明白为什么要省略Rj
     JPVRj.block<3,3>(0,0) = RiT;  //dpj
     JPVRj.block<3,3>(0,3) = O3x3;    //dvj
     JPVRj.block<3,3>(0,6) = O3x3;    //dphi_j
@@ -723,7 +733,7 @@ void EdgeNavStatePVR::linearizeOplus()
     _jacobianOplus[2] = JBiasi;
 }
 
-//
+//j时刻的（bias+增量）-（i时刻的bias+增量）
 void EdgeNavStateBias::computeError()
 {
     //
@@ -877,8 +887,10 @@ void EdgeNavStatePriorPVRBias::computeError()
 {
     const VertexNavStatePVR* vNSPVR = static_cast<const VertexNavStatePVR*>(_vertices[0]);
     const VertexNavStateBias* vNSBias = static_cast<const VertexNavStateBias*>(_vertices[1]);
+	//上一时刻的PVR和delta bias在优化过程中的估计值
     const NavState& nsPVRest = vNSPVR->estimate();
     const NavState& nsBiasest = vNSBias->estimate();
+	//上一时刻的测量
     const NavState& nsprior = _measurement;
 
     // P V R bg+dbg ba+dba
@@ -912,6 +924,7 @@ void EdgeNavStatePriorPVRBias::computeError()
     }
 }
 
+//见论文中公式8. 这里是公式8对各优化变量jacobian
 void EdgeNavStatePriorPVRBias::linearizeOplus()
 {
     // Estimated NavState
@@ -923,6 +936,7 @@ void EdgeNavStatePriorPVRBias::linearizeOplus()
 	//IMU误差对p的jacobian
     _jacobianOplusXi.block<3,3>(0,0) = - Matrix3d::Identity();//nsPVRest.Get_RotMatrix();
     _jacobianOplusXi.block<3,3>(3,3) = - Matrix3d::Identity();
+	//推导见《IMU推导附加.docx》
     _jacobianOplusXi.block<3,3>(6,6) = Sophus::SO3::JacobianRInv( _error.segment<3>(6) );
 
     _jacobianOplusXj = Matrix<double,15,6>::Zero();
