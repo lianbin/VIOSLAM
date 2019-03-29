@@ -38,11 +38,12 @@ void KeyFrame::UpdateNavStatePVRFromTcw(const cv::Mat &Tcw,const cv::Mat &Tbc)
     cv::Mat Twb = Converter::toCvMatInverse(Tbc*Tcw);
     Matrix3d Rwb = Converter::toMatrix3d(Twb.rowRange(0,3).colRange(0,3));
     Vector3d Pwb = Converter::toVector3d(Twb.rowRange(0,3).col(3));
-
+    //这里假设在优化前和优化后，速度在IMU坐标系下是不变的，变的是在全局坐标系下的速度
+    //Rw1^T*Vw1 = Rw2^T*Vw2=>Vw2 = Rw2*Rw1^T*Vw1
     Matrix3d Rw1 = mNavState.Get_RotMatrix();
     Vector3d Vw1 = mNavState.Get_V();
     Vector3d Vw2 = Rwb*Rw1.transpose()*Vw1;   // bV1 = bV2 ==> Rwb1^T*wV1 = Rwb2^T*wV2 ==> wV2 = Rwb2*Rwb1^T*wV1
-
+    //更新IMU的导航状态
     mNavState.Set_Pos(Pwb);
     mNavState.Set_Rot(Rwb);
     mNavState.Set_Vel(Vw2);
@@ -218,7 +219,7 @@ void KeyFrame::ComputePreInt(void)
         mIMUPreInt.reset();
 
         // IMU pre-integration integrates IMU data from last to current, but the bias is from last
-        //bg ba 使用的上一关键帧对应的的bg ba
+        //bg ba 使用的上一关键帧对应的的bg ba ，在初始化的时候，应该都是零
         Vector3d bg = mpPrevKeyFrame->GetNavState().Get_BiasGyr();
         Vector3d ba = mpPrevKeyFrame->GetNavState().Get_BiasAcc();
         // remember to consider the gap between the last KF and the first IMU
@@ -227,6 +228,7 @@ void KeyFrame::ComputePreInt(void)
             //这里假设这段时间内的imu的硬件测量值同第一个IMU数据相同
             const IMUData& imu = mvIMUData.front();
             double dt = imu._t - mpPrevKeyFrame->mTimeStamp;
+			//注意输入的参数
             mIMUPreInt.update(imu._g - bg,imu._a - ba,dt);
 
             // Test log

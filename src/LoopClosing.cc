@@ -587,6 +587,7 @@ void LoopClosing::CorrectLoop()
     }
 
     // Optimize graph
+    //这里的优化同纯视觉slam完全相同，只优化
     Optimizer::OptimizeEssentialGraph(mpMap, mpMatchedKF, mpCurrentKF, NonCorrectedSim3, CorrectedSim3, LoopConnections, mbFixScale, this);
 
     // Map updated, set flag for Tracking

@@ -49,6 +49,7 @@ namespace ORB_SLAM2
 
 void Optimizer::LocalBAPRVIDP(KeyFrame *pCurKF, const std::list<KeyFrame*> &lLocalKeyFrames, bool* pbStopFlag, Map* pMap, cv::Mat& gw, LocalMapping* pLM)
 {
+    //zai gu
     // Check current KeyFrame in local window
     if(pCurKF != lLocalKeyFrames.back())
         cerr<<"pCurKF != lLocalKeyFrames.back. check"<<endl;
@@ -117,7 +118,7 @@ void Optimizer::LocalBAPRVIDP(KeyFrame *pCurKF, const std::list<KeyFrame*> &lLoc
             {
                 pKFi->mnBAFixedForKF=pCurKF->mnId;
                 if(!pKFi->isBad())
-                    lFixedCameras.push_back(pKFi);
+                    lFixedCameras.push_back(pKFi);//与局部窗口帧看到相同MapPoint的共视帧。不优化，提供约束
             }
         }
     }
@@ -908,6 +909,7 @@ void Optimizer::GlobalBundleAdjustmentNavStatePRV(Map* pMap, const cv::Mat& gw, 
     }
 
 }
+
 
 void Optimizer::LocalBundleAdjustmentNavStatePRV(KeyFrame *pCurKF, const std::list<KeyFrame*> &lLocalKeyFrames, bool* pbStopFlag, Map* pMap, cv::Mat& gw, LocalMapping* pLM)
 {
@@ -2296,7 +2298,11 @@ int Optimizer::PoseOptimization(Frame *pFrame, KeyFrame* pLastKF, const IMUPrein
     pFrame->UpdatePoseFromNS(ConfigParam::GetMatTbc());
 
     // Compute marginalized Hessian H and B, H*x=B, H/B can be used as prior for next optimization in PoseOptimization
-    if(bComputeMarg)
+    //白巧克力
+    //H是求解的信息矩阵。最小二乘的时候，我们目标是使得误差的一阶导数为0嘛，
+    //而H又是一阶雅克比组成的，所以在不断迭代过程中，
+    //H的大小和误差的残差有关系。就能用来当做你求解的这个位姿准不准的先验。g2o的论文里大致描述过一些。
+	if(bComputeMarg)
     {
         std::vector<g2o::OptimizableGraph::Vertex*> margVerteces;
         margVerteces.push_back(optimizer.vertex(FramePVRId));
@@ -2310,7 +2316,7 @@ int Optimizer::PoseOptimization(Frame *pFrame, KeyFrame* pLastKF, const IMUPrein
         margCovInv.topLeftCorner(9,9) = spinv.block(0,0)->inverse();
         margCovInv.bottomRightCorner(6,6) = spinv.block(1,1)->inverse();
         pFrame->mMargCovInv = margCovInv;
-        pFrame->mNavStatePrior = ns_recov;
+        pFrame->mNavStatePrior = ns_recov;//状态的先验
     }
 
     //Test log
@@ -2931,6 +2937,7 @@ Vector3d Optimizer::OptimizeInitialGyroBias(const std::vector<KeyFrame *> &vpKFs
     return vBgEst->estimate();
 }
 
+
 Vector3d Optimizer::OptimizeInitialGyroBias(const vector<cv::Mat>& vTwc, const vector<IMUPreintegrator>& vImuPreInt)
 {
     int N = vTwc.size(); if(vTwc.size()!=vImuPreInt.size()) cerr<<"vTwc.size()!=vImuPreInt.size()"<<endl;
@@ -2950,7 +2957,7 @@ Vector3d Optimizer::OptimizeInitialGyroBias(const vector<cv::Mat>& vTwc, const v
     optimizer.setAlgorithm(solver);
 
     // Add vertex of gyro bias, to optimizer graph
-    g2o::VertexGyrBias * vBiasg = new g2o::VertexGyrBias();
+    g2o::VertexGyrBias * vBiasg = new g2o::VertexGyrBias();//待优化变量构成顶点
     vBiasg->setEstimate(Eigen::Vector3d::Zero());//给初始的估计值
     vBiasg->setId(0);
     optimizer.addVertex(vBiasg);
@@ -2964,22 +2971,26 @@ Vector3d Optimizer::OptimizeInitialGyroBias(const vector<cv::Mat>& vTwc, const v
             continue;
 
         const cv::Mat& Twi = vTwc[i-1];    // pose of previous KF
+        //i时刻的相机旋转
         Matrix3d Rwci = Converter::toMatrix3d(Twi.rowRange(0,3).colRange(0,3));
         //Matrix3d Rwci = Twi.rotation_matrix();
         const cv::Mat& Twj = vTwc[i];        // pose of this KF
+        //j时刻的相机旋转
         Matrix3d Rwcj = Converter::toMatrix3d(Twj.rowRange(0,3).colRange(0,3));
         //Matrix3d Rwcj =Twj.rotation_matrix();
-
+        //预积分器得到的两个关键帧之间的预积分结果
         const IMUPreintegrator& imupreint = vImuPreInt[i];
-
+        //添加一条边(一个误差项)
         g2o::EdgeGyrBias * eBiasg = new g2o::EdgeGyrBias();
         eBiasg->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
         // measurement is not used in EdgeGyrBias
         eBiasg->dRbij = imupreint.getDeltaR();
         eBiasg->J_dR_bg = imupreint.getJRBiasg();
+		//Rcb是标定的结果，Rwc是视觉计算的结果 
         eBiasg->Rwbi = Rwci*Rcb;
         eBiasg->Rwbj = Rwcj*Rcb;
         //eBiasg->setInformation(Eigen::Matrix3d::Identity());
+        //I到J的预积分结果的协方差矩阵的右下角3x3是关于φ的协方差
         eBiasg->setInformation(imupreint.getCovPVPhi().bottomRightCorner(3,3).inverse());
         optimizer.addEdge(eBiasg);
     }
@@ -4331,14 +4342,14 @@ void Optimizer::OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* p
         Eigen::Vector3d eigt = CorrectedSiw.translation();
         double s = CorrectedSiw.scale();
 
-        eigt *=(1./s); //[R t/s;0 1]
+        eigt *=(1./s); //[R t/s;0 1]//恢复尺度
 
         cv::Mat Tiw = Converter::toCvSE3(eigR,eigt);
 
         pKFi->SetPose(Tiw);
-
+        //！！！！！！！！！注意这里，同纯视觉slam的区别就在这里
         // Update P/V/R in NavState
-        pKFi->UpdateNavStatePVRFromTcw(Tiw,Tbc);
+        pKFi->UpdateNavStatePVRFromTcw(Tiw,Tbc);//tracking的时候，根据imu的优化更新Tcw。这里是根据Tcw的优化，更新IMU状态
     }
 
     // Correct points. Transform to "non-optimized" reference keyframe pose and transform back with optimized pose

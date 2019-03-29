@@ -88,6 +88,7 @@ public:
     {
         return SO3::exp(v).matrix();
     }
+	
     //求w的右雅克比
     // right jacobian of SO(3)
     static Matrix3d JacobianR(const Vector3d& w)

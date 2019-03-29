@@ -67,7 +67,7 @@ int main(int argc, char **argv)
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true);
 
-    ORB_SLAM2::ConfigParam config(argv[2]);
+    ORB_SLAM2::ConfigParam config(argv[2]);//参数配置，主要是相机与IMU之间的变换关系
 
     /**
      * @brief added data sync
@@ -115,6 +115,7 @@ int main(int argc, char **argv)
         sensor_msgs::ImageConstPtr simage = m.instantiate<sensor_msgs::Image>();
         if(simage!=NULL)
             msgsync.imageCallback(simage);
+		//imageMsg拿队列中最老的一个图像帧，vimuMsg拿图像帧对应的时间点之前的imu数据
         bool bdata = msgsync.getRecentMsgs(imageMsg,vimuMsg);
 
         if(bdata)
@@ -196,6 +197,8 @@ int main(int argc, char **argv)
         ROS_WARN("Run realtime");
         while(ros::ok())
         {
+        
+		    //imageMsg拿队列中最老的一个图像帧，vimuMsg拿图像帧对应的时间点之前的imu数据
             bool bdata = msgsync.getRecentMsgs(imageMsg,vimuMsg);//获取imu数据与图像数据
 
             if(bdata)

@@ -125,7 +125,7 @@ void Frame::SetInitialNavStateAndBias(const NavState& ns)
 {
     mNavState = ns;
     // Set bias as bias+delta_bias, and reset the delta_bias term
-    //更新当前帧的bias
+    //这里很重要的一个概念 更新当前帧的bias是上一帧的bias+上一帧的bias的bias
     mNavState.Set_BiasGyr(ns.Get_BiasGyr()+ns.Get_dBias_Gyr());
     mNavState.Set_BiasAcc(ns.Get_BiasAcc()+ns.Get_dBias_Acc());
 	//当前帧的偏置的增量设置为0(会在优化的时候得到)

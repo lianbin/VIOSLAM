@@ -42,6 +42,7 @@ IMUPreintegrator::IMUPreintegrator()
     _delta_R.setIdentity();    // R_k+1 = R_k*exp(w_k*dt).     note: Rwc, Rwc'=Rwc*[w_body]x
 
     // jacobian of delta measurements w.r.t bias of gyro/acc
+    
     _J_P_Biasg.setZero();     // position / gyro
     _J_P_Biasa.setZero();     // position / acc
     _J_V_Biasg.setZero();     // velocity / gyro
@@ -49,7 +50,7 @@ IMUPreintegrator::IMUPreintegrator()
     _J_R_Biasg.setZero();   // rotation / gyro
 
     // noise covariance propagation of delta measurements
-    _cov_P_V_Phi.setZero();
+    _cov_P_V_Phi.setZero();//噪声传递9维度
 
     _delta_time = 0;
 }
@@ -78,14 +79,17 @@ void IMUPreintegrator::reset()
 // incrementally update 1)delta measurements, 2)jacobians, 3)covariance matrix
 // acc: acc_measurement - bias_a, last measurement!! not current measurement
 // omega: gyro_measurement - bias_g, last measurement!! not current measurement
+//输入的参数omega是 角速度的测量值-陀螺的偏移（在上一个关键帧的偏移）
+//acc 加速度的测量值-加速度计的偏移（在上一个关键帧的偏移）
 void IMUPreintegrator::update(const Vector3d& omega, const Vector3d& acc, const double& dt)
 {
     double dt2 = dt*dt;
-
-    Matrix3d dR = Expmap(omega*dt);//旋转的积分
+    //公式26
+    Matrix3d dR = Expmap(omega*dt);//旋转的积分   。
+    //右雅克比矩阵
     Matrix3d Jr = JacobianR(omega*dt);
 
-    //噪声的协方差传递
+    //噪声的协方差传递 公式44
     // noise covariance propagation of delta measurements
     // err_k+1 = A*err_k + B*err_gyro + C*err_acc
     Matrix3d I3x3 = Matrix3d::Identity();
@@ -116,6 +120,7 @@ void IMUPreintegrator::update(const Vector3d& omega, const Vector3d& acc, const 
     //测量公式
     // delta measurements, position/velocity/rotation(matrix)
     // update P first, then V, then R. because P's update need V&R's previous state
+    //预积分测量值的计算以及更新 这里要尽快形成文档
     _delta_P += _delta_V*dt + 0.5*_delta_R*acc*dt2;    // P_k+1 = P_k + V_k*dt + R_k*a_k*dt*dt/2
     _delta_V += _delta_R*acc*dt;
     _delta_R = normalizeRotationM(_delta_R*dR);  // normalize rotation, in case of numerical error accumulation

@@ -70,6 +70,9 @@ public:
             {
                 const IMUData& imu = mvIMUData.front();
                 double dt = std::max(0., imu._t - mpPrevKeyFrame->mTimeStamp);
+				//到这里的时候，加速度的偏置还是为零，所以不做考虑
+				//在存在bg的情况下，重新进行预积分。
+				//????????????为什么不直接使用在bias变化是的预积分方法，直接在原来的基础上+Jdbiasg*delta biag
                 mIMUPreInt.update(imu._g - bg,imu._a ,dt);  // Acc bias not considered here
             }
             // integrate each imu
@@ -166,7 +169,7 @@ void LocalMapping::VINSInitThread()
     cerr<<"start VINSInitThread"<<endl;
     while(1)
     {
-        if(KeyFrame::nNextId > 2)
+        if(KeyFrame::nNextId > 2)//mnId是从0开始计数的，所以说当nNextId大于2的时候，说明最少已经存在3个关键帧
             if(!GetVINSInited() && mpCurrentKeyFrame->mnId > initedid)
             {
                 initedid = mpCurrentKeyFrame->mnId;
@@ -244,26 +247,26 @@ bool LocalMapping::TryInitVIO(void)
     int N = vScaleGravityKF.size();
     KeyFrame* pNewestKF = vScaleGravityKF[N-1];//最新的一帧
     vector<cv::Mat> vTwc;
-    vector<IMUPreintegrator> vIMUPreInt;
+    vector<IMUPreintegrator> vIMUPreInt;//预积分数组
     // Store initialization-required KeyFrame data
     vector<KeyFrameInit*> vKFInit;
 
     for(int i=0;i<N;i++)
     {
         KeyFrame* pKF = vScaleGravityKF[i];
-        vTwc.push_back(pKF->GetPoseInverse());
-        vIMUPreInt.push_back(pKF->GetIMUPreInt());
+        vTwc.push_back(pKF->GetPoseInverse());//关键帧的位姿Twc
+        vIMUPreInt.push_back(pKF->GetIMUPreInt());//预积分结果
         KeyFrameInit* pkfi = new KeyFrameInit (*pKF);
         if(i!=0)
         {
-            pkfi->mpPrevKeyFrame = vKFInit[i-1];
+            pkfi->mpPrevKeyFrame = vKFInit[i-1];//前一个关键帧
         }
         vKFInit.push_back(pkfi);
     }
 
     SetFlagCopyInitKFs(false);
 
-    // Step 1.
+    // Step 1. 估计陀螺的零偏
     // Try to compute initial gyro bias, using optimization with Gauss-Newton
     Vector3d bgest = Optimizer::OptimizeInitialGyroBias(vTwc,vIMUPreInt);
     //Vector3d bgest = Optimizer::OptimizeInitialGyroBias(vScaleGravityKF);
@@ -273,19 +276,20 @@ bool LocalMapping::TryInitVIO(void)
     {
         vKFInit[i]->bg = bgest;//更新bg
     }
+	//重新进行预积分计算
     for(int i=0;i<N;i++)
     {
-        vKFInit[i]->ComputePreInt();//重新进行预积分计算
+        vKFInit[i]->ComputePreInt();
     }
-
+     
     // Solve A*x=B for x=[s,gw] 4x1 vector
     cv::Mat A = cv::Mat::zeros(3*(N-2),4,CV_32F);
     cv::Mat B = cv::Mat::zeros(3*(N-2),1,CV_32F);
     cv::Mat I3 = cv::Mat::eye(3,3,CV_32F);
 
-    // Step 2.
+    // Step 2. 估计尺度与重力加速度
     // Approx Scale and Gravity vector in 'world' frame (first KF's camera frame)
-    for(int i=0; i<N-2; i++)
+    for(int i=0; i<N-2; i++)//每三个关键帧数据联立成一个方程
     {
         //KeyFrameInit* pKF1 = vKFInit[i];//vScaleGravityKF[i];
         KeyFrameInit* pKF2 = vKFInit[i+1];
@@ -313,8 +317,10 @@ bool LocalMapping::TryInitVIO(void)
 
         // Stack to A/B matrix
         // lambda*s + beta*g = gamma
+        //论文公式13
         cv::Mat lambda = (pc2-pc1)*dt23 + (pc2-pc3)*dt12;
         cv::Mat beta = 0.5*I3*(dt12*dt12*dt23 + dt12*dt23*dt23);
+		//gamma感觉和论文中相差一个负号？？？？？
         cv::Mat gamma = (Rc3-Rc2)*pcb*dt12 + (Rc1-Rc2)*pcb*dt23 + Rc1*Rcb*dp12*dt23 - Rc2*Rcb*dp23*dt12 - Rc1*Rcb*dv12*dt12*dt23;
         lambda.copyTo(A.rowRange(3*i+0,3*i+3).col(0));
         beta.copyTo(A.rowRange(3*i+0,3*i+3).colRange(1,4));
@@ -350,7 +356,7 @@ bool LocalMapping::TryInitVIO(void)
         winv.at<float>(i,i) = 1./w.at<float>(i);
     }
     // Then x = vt'*winv*u'*B
-    cv::Mat x = vt.t()*winv*u.t()*B;//使用SVD分解的方法求解Ax=b的方程组
+    cv::Mat x = vt.t()*winv*u.t()*B;//使用SVD分解的方法求解Ax=b的方程组 因为SVD分解的矩阵，求逆很方便
 
     // x=[s,gw] 4x1 vector
     double sstar = x.at<float>(0);    // scale should be positive 尺度
@@ -364,7 +370,7 @@ bool LocalMapping::TryInitVIO(void)
     if(w.type()!=I3.type() || u.type()!=I3.type() || vt.type()!=I3.type())
         cerr<<"different mat type, I3,w,u,vt: "<<I3.type()<<","<<w.type()<<","<<u.type()<<","<<vt.type()<<endl;
 
-    // Step 3.
+    // Step 3. 估计加速度的偏置以及重新优化尺度和重力
     // Use gravity magnitude 9.8 as constraint
     // gI = [0;0;1], the normalized gravity vector in an inertial frame, NED type with no orientation.
     cv::Mat gI = cv::Mat::zeros(3,1,CV_32F);
@@ -471,14 +477,14 @@ bool LocalMapping::TryInitVIO(void)
     dthetaxy.copyTo(dtheta.rowRange(0,2));
     Eigen::Vector3d dthetaeig = Converter::toVector3d(dtheta);
     // Rwi_ = Rwi*exp(dtheta)
-    Eigen::Matrix3d Rwieig_ = RWIeig*Sophus::SO3::exp(dthetaeig).matrix();
+    Eigen::Matrix3d Rwieig_ = RWIeig*Sophus::SO3::exp(dthetaeig).matrix();//公式16
     cv::Mat Rwi_ = Converter::toCvMat(Rwieig_);
 
 
     // Debug log
     {
-        cv::Mat gwbefore = Rwi*GI; //更新gw
-        cv::Mat gwafter = Rwi_*GI;
+        cv::Mat gwbefore = Rwi*GI; //得到更新之后的gw
+        cv::Mat gwafter = Rwi_*GI; //
         cout<<"Time: "<<mpCurrentKeyFrame->mTimeStamp - mnStartTime<<", sstar: "<<sstar<<", s: "<<s_<<endl;
 
         fgw<<mpCurrentKeyFrame->mTimeStamp<<" "
@@ -560,6 +566,7 @@ bool LocalMapping::TryInitVIO(void)
                 cv::Mat wPc = pKF->GetPoseInverse().rowRange(0,3).col(3);                   // wPc
                 cv::Mat Rwc = pKF->GetPoseInverse().rowRange(0,3).colRange(0,3);            // Rwc
                 // Set position and rotation of navstate
+                //更新IMU在全局坐标系下的坐标
                 cv::Mat wPb = scale*wPc + Rwc*pcb;//现在尺度是已知的
                 //设置惯导导航状态
                 pKF->SetNavStatePos(Converter::toVector3d(wPb));
@@ -585,7 +592,7 @@ bool LocalMapping::TryInitVIO(void)
                     cv::Mat Jpba = Converter::toCvMat(imupreint.getJPBiasa());    // J_deltaP_biasa
                     cv::Mat wPcnext = pKFnext->GetPoseInverse().rowRange(0,3).col(3);           // wPc next
                     cv::Mat Rwcnext = pKFnext->GetPoseInverse().rowRange(0,3).colRange(0,3);    // Rwc next
-                    //对照论文的公式18 ，少了带有delataθ的那一项
+                    //对照论文的公式18 ，少了带有delataθ的那一项？？？？？
                     cv::Mat vel = - 1./dt*( scale*(wPc - wPcnext) + (Rwc - Rwcnext)*pcb + Rwc*Rcb*(dp + Jpba*dbiasa_) + 0.5*gw*dt*dt );
                     Eigen::Vector3d veleig = Converter::toVector3d(vel);
                     pKF->SetNavStateVel(veleig);
@@ -604,13 +611,14 @@ bool LocalMapping::TryInitVIO(void)
                     //
                     Eigen::Vector3d velpre = pKFprev->GetNavState().Get_V();
                     Eigen::Matrix3d rotpre = pKFprev->GetNavState().Get_RotMatrix();
-					//这里同论文3进行比较，少了bg的一项
+					//这里同论文3进行比较，少了bg的一项？？？？？？
                     Eigen::Vector3d veleig = velpre + gweig*dt + rotpre*( dv + Jvba*dbiasa_eig );
                     pKF->SetNavStateVel(veleig);
                 }
             }
             //得到随机游走参数之后，重新进行预积分的计算
             // Re-compute IMU pre-integration at last. Should after usage of pre-int measurements.
+            //所有参数确定之后，重新进行一次预积分的计算
             for(vector<KeyFrame*>::const_iterator vit=vScaleGravityKF.begin(), vend=vScaleGravityKF.end(); vit!=vend; vit++)
             {
                 KeyFrame* pKF = *vit;
@@ -620,12 +628,13 @@ bool LocalMapping::TryInitVIO(void)
 
             // Update poses (multiply metric scale)
             //这里更新的是localMap中的所有帧
+            //在初始化的过程中，可能会有很多新的关键帧加入
             vector<KeyFrame*> mspKeyFrames = mpMap->GetAllKeyFrames();
             for(std::vector<KeyFrame*>::iterator sit=mspKeyFrames.begin(), send=mspKeyFrames.end(); sit!=send; sit++)
             {
-                KeyFrame* pKF = *sit;
+	            KeyFrame* pKF = *sit;
                 cv::Mat Tcw = pKF->GetPose();
-                cv::Mat tcw = Tcw.rowRange(0,3).col(3)*scale;//更新关键帧的轨迹的尺度
+	            cv::Mat tcw = Tcw.rowRange(0,3).col(3)*scale;//更新关键帧的轨迹的尺度
                 tcw.copyTo(Tcw.rowRange(0,3).col(3));
                 pKF->SetPose(Tcw);
             }
@@ -640,13 +649,13 @@ bool LocalMapping::TryInitVIO(void)
             std::cout<<std::endl<<"... Map scale updated ..."<<std::endl<<std::endl;
 
             // Update NavStates
-            if(pNewestKF!=mpCurrentKeyFrame)
+            if(pNewestKF!=mpCurrentKeyFrame)//用于初始化IMU的最新一帧不是最新的关键帧
             {
                 KeyFrame* pKF;
 
-                // step1. bias&d_bias
+                // step1. bias&d_bias ，
                 pKF = pNewestKF;
-                do
+                do//更新用于初始化的关键帧->当前地图中最新的关键帧之间所有关键帧的bg ba
                 {
                     pKF = pKF->GetNextKeyFrame();
 
@@ -662,19 +671,20 @@ bool LocalMapping::TryInitVIO(void)
                 pKF = pNewestKF;
                 do
                 {
-                    pKF = pKF->GetNextKeyFrame();
+                    pKF = pKF->GetNextKeyFrame();//重新计算用于初始化的最新关键帧->当前地图中最新的关键帧的预积分
 
                     pKF->ComputePreInt();
                 }while(pKF!=mpCurrentKeyFrame);
 
                 // step3. update pos/rot
                 pKF = pNewestKF;
-                do
+                do//更新用于初始化的最新关键帧->当前地图中最新的关键帧的导航状态
                 {
                     pKF = pKF->GetNextKeyFrame();
 
                     // Update rot/pos
                     // Position and rotation of visual SLAM
+                    //前面已经对视觉的尺度进行了更新，所以这里不需要再乘以尺度了
                     cv::Mat wPc = pKF->GetPoseInverse().rowRange(0,3).col(3);                   // wPc
                     cv::Mat Rwc = pKF->GetPoseInverse().rowRange(0,3).colRange(0,3);            // Rwc
                     cv::Mat wPb = wPc + Rwc*pcb;
@@ -859,6 +869,7 @@ bool LocalMapping::TryInitVIO(void)
 
 void LocalMapping::AddToLocalWindow(KeyFrame* pKF)
 {
+    //维护一个确定大小的关键帧窗口
     mlLocalKeyFrames.push_back(pKF);
     if(mlLocalKeyFrames.size() > mnLocalWindowSize)
     {
@@ -866,14 +877,17 @@ void LocalMapping::AddToLocalWindow(KeyFrame* pKF)
     }
     else
     {
-        KeyFrame* pKF0 = mlLocalKeyFrames.front();
+        KeyFrame* pKF0 = mlLocalKeyFrames.front();//最老的一个
         while(mlLocalKeyFrames.size() < mnLocalWindowSize && pKF0->GetPrevKeyFrame()!=NULL)
         {
+            //这里的意思是，如果窗口的大小，小于定义的大小，那么要把窗口填满。
+            //填的方式是，从最老的那个关键帧开始，逐步一直找更老的，直到把窗格填满。
             pKF0 = pKF0->GetPrevKeyFrame();
             mlLocalKeyFrames.push_front(pKF0);
         }
     }
 }
+
 
 void LocalMapping::DeleteBadInLocalWindow(void)
 {
@@ -968,6 +982,7 @@ void LocalMapping::Run()
                     }
                     else
                     {
+                        //mlLocalKeyFrames存储的是最新的10帧数据
                         //Optimizer::LocalBundleAdjustmentNavStatePRV(mpCurrentKeyFrame,mlLocalKeyFrames,&mbAbortBA, mpMap, mGravityVec, this);
                         Optimizer::LocalBAPRVIDP(mpCurrentKeyFrame,mlLocalKeyFrames,&mbAbortBA, mpMap, mGravityVec, this);
                     }
@@ -1079,7 +1094,7 @@ void LocalMapping::ProcessNewKeyFrame()
     // Delete bad KF in LocalWindow
     DeleteBadInLocalWindow();
     // Add Keyframe to LocalWindow
-    AddToLocalWindow(mpCurrentKeyFrame);
+    AddToLocalWindow(mpCurrentKeyFrame);//维护一个局部的窗口，只保留最新的10帧数据
 
     // Insert Keyframe in Map
     mpMap->AddKeyFrame(mpCurrentKeyFrame);
@@ -1547,6 +1562,7 @@ void LocalMapping::InterruptBA()
     mbAbortBA = true;
 }
 
+//同纯视觉slam不相同的剔除策略
 void LocalMapping::KeyFrameCulling()
 {
 
@@ -1594,7 +1610,7 @@ void LocalMapping::KeyFrameCulling()
         // Don't drop the KF before current KF
         if(pKF->GetNextKeyFrame() == mpCurrentKeyFrame)
             continue;
-        if(pKF->mTimeStamp >= mpCurrentKeyFrame->mTimeStamp - 0.11)
+        if(pKF->mTimeStamp >= mpCurrentKeyFrame->mTimeStamp - 0.11)//不能剔除当前关键帧的前一帧
             continue;
 
         if(pPrevKF && pNextKF)

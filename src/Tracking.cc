@@ -228,7 +228,7 @@ bool Tracking::TrackLocalMapWithIMU(bool bMapUpdated)
     UpdateLocalMap();
 
     SearchLocalPoints();
-
+    //在SearchLocalPoints中，会更新当前帧的MapPoint。所以这里重新对当前帧的位姿进行优化
     // Map updated, optimize with last KeyFrame
     if(mpLocalMapper->GetFirstVINSInited() || bMapUpdated)
     {
@@ -292,6 +292,7 @@ void Tracking::PredictNavStateByIMU(bool bMapUpdated)
     if(!mpLocalMapper->GetVINSInited()) cerr<<"mpLocalMapper->GetVINSInited() not, shouldn't in PredictNavStateByIMU"<<endl;
 
     // Map updated, optimize with last KeyFrame
+    //地图刚刚进行了更新
     if(mpLocalMapper->GetFirstVINSInited() || bMapUpdated)
     {
         //if(mpLocalMapper->GetFirstVINSInited() && !bMapUpdated) cerr<<"2-FirstVinsInit, but not bMapUpdated. shouldn't"<<endl;
@@ -304,7 +305,7 @@ void Tracking::PredictNavStateByIMU(bool bMapUpdated)
         mCurrentFrame.SetInitialNavStateAndBias(mpLastKeyFrame->GetNavState());
 		//根据本次计算的预积分更新导航状态
         mCurrentFrame.UpdateNavState(mIMUPreIntInTrack,Converter::toVector3d(mpLocalMapper->GetGravityVec()));
-        //根据IMU的导航状态，更新Tcw
+        //根据IMU的导航状态，更新Tcw.到这里的时候，还没有根据视觉得到一个相机的位姿
 		mCurrentFrame.UpdatePoseFromNS(ConfigParam::GetMatTbc());
 
         // Test log
@@ -320,6 +321,7 @@ void Tracking::PredictNavStateByIMU(bool bMapUpdated)
         mIMUPreIntInTrack = GetIMUPreIntSinceLastFrame(&mCurrentFrame, &mLastFrame);
 
         // Get initial pose from Last Frame
+        //将初始位姿设置为上一帧的位姿
         mCurrentFrame.SetInitialNavStateAndBias(mLastFrame.GetNavState());
         mCurrentFrame.UpdateNavState(mIMUPreIntInTrack,Converter::toVector3d(mpLocalMapper->GetGravityVec()));
         mCurrentFrame.UpdatePoseFromNS(ConfigParam::GetMatTbc());
@@ -340,7 +342,7 @@ bool Tracking::TrackWithIMU(bool bMapUpdated)
 
     // Predict NavState&Pose by IMU
     // And compute the IMU pre-integration for PoseOptimization
-    PredictNavStateByIMU(bMapUpdated);
+    PredictNavStateByIMU(bMapUpdated);//使用预积分更新了IMU的导航状态，同时也更新了当前帧的Tcw，作为优化的初值
 
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
 
@@ -413,7 +415,7 @@ IMUPreintegrator Tracking::GetIMUPreIntSinceLastKF(Frame* pCurF, KeyFrame* pLast
     IMUPreintegrator IMUPreInt;
 	//首先清零预积分器
     IMUPreInt.reset();
-    //使用上一帧的bg ba
+    //使用上一帧的bg ba 注意这里，使用的是上一个关键帧的随机游走数据
     Vector3d bg = pLastKF->GetNavState().Get_BiasGyr();
     Vector3d ba = pLastKF->GetNavState().Get_BiasAcc();
 
@@ -748,12 +750,12 @@ void Tracking::Track()
     // Different operation, according to whether the map is updated
     //这里，根据地图是否是刚刚完成更新，执行不同的操作
     bool bMapUpdated = false;
-    if(mpLocalMapper->GetMapUpdateFlagForTracking())
+    if(mpLocalMapper->GetMapUpdateFlagForTracking())//地图线程更新地图
     {
         bMapUpdated = true;
         mpLocalMapper->SetMapUpdateFlagInTracking(false);
     }
-    if(mpLoopClosing->GetMapUpdateFlagForTracking())
+    if(mpLoopClosing->GetMapUpdateFlagForTracking())//回环更新地图
     {
         bMapUpdated = true;
         mpLoopClosing->SetMapUpdateFlagInTracking(false);
@@ -809,7 +811,7 @@ void Tracking::Track()
                     }
                 }
                 // If Visual-Inertial not initialized, keep the same as pure-vslam
-                else
+                else//如果IMU没有初始化，那么保持纯视觉slam的方法
 #endif
                 {
                     if(mVelocity.empty() || mCurrentFrame.mnId<mnLastRelocFrameId+2)
@@ -846,11 +848,11 @@ void Tracking::Track()
 #ifndef TRACK_WITH_IMU
                 bOK = TrackLocalMap();
 #else
-                if(!mpLocalMapper->GetVINSInited())
+                if(!mpLocalMapper->GetVINSInited())//如果IMU没有初始化，则保持纯视觉slam
                     bOK = TrackLocalMap();
                 else
                 {
-                    if(mbRelocBiasPrepare)
+                    if(mbRelocBiasPrepare)//刚刚进行过重定位 ，因为重定位之后，需要重新初始化IMU的偏置，所以会等待一段时间
                     {
                         // 20 Frames after reloc, track with only vision
                         bOK = TrackLocalMap();
@@ -874,7 +876,7 @@ void Tracking::Track()
             mState = OK;
 
             // Add Frames to re-compute IMU bias after reloc
-            if(mbRelocBiasPrepare)//刚刚进行过重定位
+            if(mbRelocBiasPrepare)//刚刚进行过重定位 
             {
                 mv20FramesReloc.push_back(mCurrentFrame);
 
@@ -1157,7 +1159,7 @@ void Tracking::CreateInitialMapMonocular()
     for(size_t i=0; i<mvIMUSinceLastKF.size(); i++)
     {
         IMUData imu = mvIMUSinceLastKF[i];
-        if(imu._t < mInitialFrame.mTimeStamp)
+        if(imu._t < mInitialFrame.mTimeStamp)//这里应该是不成立的。因为在得到第一个初始化的有效帧时，清楚了该有效帧之前的所有数据
             vimu1.push_back(imu);
         else
             vimu2.push_back(imu);
@@ -1170,10 +1172,10 @@ void Tracking::CreateInitialMapMonocular()
     pKFini->ComputePreInt();
     KeyFrame* pKFcur = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB,vimu2,pKFini);
 	//预积分计算
-	pKFcur->ComputePreInt();
+	pKFcur->ComputePreInt();//计算两个关键帧之间的预积分数据
     // Clear IMUData buffer
-    //清零两个关键帧之间的IMU数据
-    mvIMUSinceLastKF.clear();
+   
+    mvIMUSinceLastKF.clear(); //预积分之后，清零关键帧之前的IMU数据
 
     pKFini->ComputeBoW();
     pKFcur->ComputeBoW();
@@ -1232,7 +1234,7 @@ void Tracking::CreateInitialMapMonocular()
 
     // Scale initial baseline
     cv::Mat Tc2w = pKFcur->GetPose();
-    Tc2w.col(3).rowRange(0,3) = Tc2w.col(3).rowRange(0,3)*invMedianDepth;
+    Tc2w.col(3).rowRange(0,3) = Tc2w.col(3).rowRange(0,3)*invMedianDepth;//初始位姿的平移，确定一个尺度
     pKFcur->SetPose(Tc2w);
 
     // Scale points
@@ -1242,7 +1244,7 @@ void Tracking::CreateInitialMapMonocular()
         if(vpAllMapPoints[iMP])
         {
             MapPoint* pMP = vpAllMapPoints[iMP];
-            pMP->SetWorldPos(pMP->GetWorldPos()*invMedianDepth);
+            pMP->SetWorldPos(pMP->GetWorldPos()*invMedianDepth);//确定尺度，所有空间点，同时乘以一个尺度
         }
     }
 
@@ -1622,7 +1624,7 @@ void Tracking::CreateNewKeyFrame()
     // Set initial NavState for KeyFrame
     pKF->SetInitialNavStateAndBias(mCurrentFrame.GetNavState());
     // Compute pre-integrator
-    pKF->ComputePreInt();
+    pKF->ComputePreInt();//两个关键帧之间进行预积分
     // Clear IMUData buffer
     mvIMUSinceLastKF.clear();
 

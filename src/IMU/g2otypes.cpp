@@ -1453,7 +1453,7 @@ bool VertexGyrBias::write(std::ostream& os) const
         os << est[i] << " ";
     return os.good();
 }
-
+//这里是陀螺仪的增量的增量
 void VertexGyrBias::oplusImpl(const double* update_)  {
     Eigen::Map<const Vector3d> update(update_);
     _estimate += update;
@@ -1479,11 +1479,13 @@ bool EdgeGyrBias::write(std::ostream& os) const
     return true;
 }
 
+//误差的计算 
 void EdgeGyrBias::computeError()
 {
+    //拿到顶点
     const VertexGyrBias* v = static_cast<const VertexGyrBias*>(_vertices[0]);
     Vector3d bg = v->estimate();
-    Matrix3d dRbg = Sophus::SO3::exp(J_dR_bg * bg).matrix();
+    Matrix3d dRbg = Sophus::SO3::exp(J_dR_bg * bg).matrix();//公式
     Sophus::SO3 errR ( ( dRbij * dRbg ).transpose() * Rwbi.transpose() * Rwbj ); // dRij^T * Riw * Rwj
     _error = errR.log();//取对数
     // Debug log
@@ -1492,7 +1494,7 @@ void EdgeGyrBias::computeError()
     //std::cout<<"chi2: "<<_error.dot(information()*_error)<<std::endl;
 }
 
-
+//？？？？？？？
 void EdgeGyrBias::linearizeOplus()
 {
     Sophus::SO3 errR ( dRbij.transpose() * Rwbi.transpose() * Rwbj ); // dRij^T * Riw * Rwj

@@ -43,8 +43,8 @@ bool MsgSynchronizer::getRecentMsgs(sensor_msgs::ImageConstPtr &imgmsg, std::vec
         sensor_msgs::ImuConstPtr bmsg;
 
         //
-        imsg = _imageMsgQueue.back(); //最后一个image
-        bmsg = _imuMsgQueue.front();  //imu的第一个数据
+        imsg = _imageMsgQueue.back(); //最后一个push进去的数据
+        bmsg = _imuMsgQueue.front();  //imu的第一个数据（第一个push进去的数据）
 
         // Check dis-continuity, tolerance 3 seconds
         if(imsg->header.stamp.toSec()-_imageMsgDelaySec + 3.0 < bmsg->header.stamp.toSec() )
