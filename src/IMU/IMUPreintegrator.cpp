@@ -84,16 +84,18 @@ void IMUPreintegrator::reset()
 void IMUPreintegrator::update(const Vector3d& omega, const Vector3d& acc, const double& dt)
 {
     double dt2 = dt*dt;
-    //公式26
-    Matrix3d dR = Expmap(omega*dt);//旋转的积分   。
+    Matrix3d dR = Expmap(omega*dt);//旋转积分 ，公式26[预积分总结与公式推导]
     //右雅克比矩阵
     Matrix3d Jr = JacobianR(omega*dt);
 
-    //噪声的协方差传递 公式44
+    //噪声的协方差传递 
     // noise covariance propagation of delta measurements
     // err_k+1 = A*err_k + B*err_gyro + C*err_acc
     Matrix3d I3x3 = Matrix3d::Identity();
-    Matrix<double,9,9> A = Matrix<double,9,9>::Identity();//协方差矩阵为9*9
+	//公式44[预积分总结与公式推导] 与论文中不同的是
+	//论文中定义的噪声向量的顺序是δφ δv δp。代码中是 δp δv δφ的顺序
+	//所以A矩阵的第一列与第三列是论文中的第三列与第一列(交换第1列与第3列)
+    Matrix<double,9,9> A = Matrix<double,9,9>::Identity();
     A.block<3,3>(6,6) = dR.transpose();
     A.block<3,3>(3,6) = -_delta_R*skew(acc)*dt;//_delta_R的初始值为一个单位阵
     A.block<3,3>(0,6) = -0.5*_delta_R*skew(acc)*dt2;
@@ -103,7 +105,7 @@ void IMUPreintegrator::update(const Vector3d& omega, const Vector3d& acc, const 
     Matrix<double,9,3> Ca = Matrix<double,9,3>::Zero();
     Ca.block<3,3>(3,0) = _delta_R*dt;
     Ca.block<3,3>(0,0) = 0.5*_delta_R*dt2;
-	//预计分公式47
+	//协方差传递 公式47[预积分总结与公式推导] 
     _cov_P_V_Phi = A*_cov_P_V_Phi*A.transpose() + 
         Bg*IMUData::getGyrMeasCov()*Bg.transpose() + 
         Ca*IMUData::getAccMeasCov()*Ca.transpose();
@@ -111,18 +113,22 @@ void IMUPreintegrator::update(const Vector3d& omega, const Vector3d& acc, const 
     //测量对随机游走的雅克比矩阵
     // jacobian of delta measurements w.r.t bias of gyro/acc
     // update P first, then V, then R
-    _J_P_Biasa += _J_V_Biasa*dt - 0.5*_delta_R*dt2;
-    _J_P_Biasg += _J_V_Biasg*dt - 0.5*_delta_R*skew(acc)*_J_R_Biasg*dt2;
-    _J_V_Biasa += -_delta_R*dt;
-    _J_V_Biasg += -_delta_R*skew(acc)*_J_R_Biasg*dt;
-	//看  deltaR对bg求偏导.jpg     的重新推导
-    _J_R_Biasg = dR.transpose()*_J_R_Biasg - Jr*dt;
+    //注意这里的求雅克比的顺序很重要，一定是p v r的顺序
+    _J_P_Biasa += _J_V_Biasa*dt - 0.5*_delta_R*dt2;//公式63[预积分总结与公式推导] 
+    _J_P_Biasg += _J_V_Biasg*dt - 0.5*_delta_R*skew(acc)*_J_R_Biasg*dt2;//公式62[预积分总结与公式推导] 
+    _J_V_Biasa += -_delta_R*dt;//公式61[预积分总结与公式推导]
+    _J_V_Biasg += -_delta_R*skew(acc)*_J_R_Biasg*dt;//公式60[预积分总结与公式推导]
+	//《 deltaR对bg求偏导.jpg》     的重新推导
+    _J_R_Biasg = dR.transpose()*_J_R_Biasg - Jr*dt;//公式59[预积分总结与公式推导]
     //测量公式
     // delta measurements, position/velocity/rotation(matrix)
     // update P first, then V, then R. because P's update need V&R's previous state
-    //预积分测量值的计算以及更新 这里要尽快形成文档
+    //预积分测量值更新
+     //公式29[预积分总结与公式推导]
     _delta_P += _delta_V*dt + 0.5*_delta_R*acc*dt2;    // P_k+1 = P_k + V_k*dt + R_k*a_k*dt*dt/2
+    //公式28[预积分总结与公式推导]
     _delta_V += _delta_R*acc*dt;
+	//公式26[预积分总结与公式推导]
     _delta_R = normalizeRotationM(_delta_R*dR);  // normalize rotation, in case of numerical error accumulation
 
 

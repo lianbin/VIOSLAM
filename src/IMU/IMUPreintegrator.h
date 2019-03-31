@@ -95,9 +95,10 @@ public:
     {
         Matrix3d Jr = Matrix3d::Identity();
         double theta = w.norm();//向量的模
-        if(theta<0.00001)
+        
+        if(theta<0.00001)//当w是小量的时候，右雅克比近似为单位阵
         {
-            return Jr;// = Matrix3d::Identity();
+            return Jr;  // = Matrix3d::Identity();
         }
         else
         {

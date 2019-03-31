@@ -79,6 +79,9 @@ int main(int argc, char **argv)
     ros::Subscriber imusub;
     if(ORB_SLAM2::ConfigParam::GetRealTimeFlag())
     {
+        //图像的缓存区设置为2，是否存在可能消息被舍弃的可能？
+        //另外，缓冲区设置很小(如1~2)的原因，可能是因为：当程序处理的帧率小于摄像头帧率，如果
+        //缓冲区很大，必然会导致大量的压栈数据，设置为很小，则默认丢弃老的数据，保留最新的数据，为实时性考虑。
         imagesub = nh.subscribe(config._imageTopic, /*200*/ 2, &ORBVIO::MsgSynchronizer::imageCallback, &msgsync);
         imusub = nh.subscribe(config._imuTopic, 200, &ORBVIO::MsgSynchronizer::imuCallback, &msgsync);
     }
@@ -91,6 +94,7 @@ int main(int argc, char **argv)
 
     ros::Rate r(1000);
 
+	//非实时
     if(!ORB_SLAM2::ConfigParam::GetRealTimeFlag())
     {
         ROS_WARN("Run not-realtime");
@@ -124,6 +128,7 @@ int main(int argc, char **argv)
             //ROS_INFO("image time: %.3f",imageMsg->header.stamp.toSec());
             for(unsigned int i=0;i<vimuMsg.size();i++)
             {
+                //加速度
                 sensor_msgs::ImuConstPtr imuMsg = vimuMsg[i];
                 double ax = imuMsg->linear_acceleration.x;
                 double ay = imuMsg->linear_acceleration.y;
@@ -134,6 +139,7 @@ int main(int argc, char **argv)
                     ay *= g3dm;
                     az *= g3dm;
                 }
+				//生成一帧IMU数据
                 ORB_SLAM2::IMUData imudata(imuMsg->angular_velocity.x,imuMsg->angular_velocity.y,imuMsg->angular_velocity.z,
                                 ax,ay,az,imuMsg->header.stamp.toSec());
                 vimuData.push_back(imudata);
@@ -159,9 +165,10 @@ int main(int argc, char **argv)
                 // To test relocalization
                 static double startT=-1;
                 if(startT<0)
-                    startT = imageMsg->header.stamp.toSec();
+                    startT = imageMsg->header.stamp.toSec(); //记录第一个图像帧时间
                 // Below to test relocalizaiton
                 //if(imageMsg->header.stamp.toSec() > startT+25 && imageMsg->header.stamp.toSec() < startT+25.3)
+                //用来规避由于开始的时候，没有运动，导致IMU没有足够的激励，图像没有足够的平移，导致的初始化失败
                 if(imageMsg->header.stamp.toSec() < startT+config._testDiscardTime)
                     im = cv::Mat::zeros(im.rows,im.cols,im.type());
             }

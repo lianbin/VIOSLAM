@@ -342,7 +342,7 @@ bool Tracking::TrackWithIMU(bool bMapUpdated)
 
     // Predict NavState&Pose by IMU
     // And compute the IMU pre-integration for PoseOptimization
-    PredictNavStateByIMU(bMapUpdated);//使用预积分更新了IMU的导航状态，同时也更新了当前帧的Tcw，作为优化的初值
+    PredictNavStateByIMU(bMapUpdated);
 
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
 
@@ -494,7 +494,7 @@ cv::Mat Tracking::GrabImageMonoVI(const cv::Mat &im, const std::vector<IMUData> 
         else
             cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
     }
-
+    //存储帧对应的imu信息，其他完全同纯视觉ORB
     if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
         mCurrentFrame = Frame(mImGray,timestamp,vimu,mpIniORBextractor,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
     else
@@ -748,18 +748,19 @@ void Tracking::Track()
     unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
 
     // Different operation, according to whether the map is updated
-    //这里，根据地图是否是刚刚完成更新，执行不同的操作
+    //根据地图是否是刚刚完成更新，执行不同的操作
     bool bMapUpdated = false;
-    if(mpLocalMapper->GetMapUpdateFlagForTracking())//地图线程更新地图
+    if(mpLocalMapper->GetMapUpdateFlagForTracking())//localMapping更新地图
     {
         bMapUpdated = true;
         mpLocalMapper->SetMapUpdateFlagInTracking(false);
     }
-    if(mpLoopClosing->GetMapUpdateFlagForTracking())//回环更新地图
+    if(mpLoopClosing->GetMapUpdateFlagForTracking())//loopClosing更新地图
     {
         bMapUpdated = true;
         mpLoopClosing->SetMapUpdateFlagInTracking(false);
     }
+	
     if(mCurrentFrame.mnId == mnLastRelocFrameId + 20)
     {
         bMapUpdated = true;
@@ -1145,7 +1146,7 @@ void Tracking::MonocularInitialization()
             cv::Mat Tcw = cv::Mat::eye(4,4,CV_32F);
             Rcw.copyTo(Tcw.rowRange(0,3).colRange(0,3));
             tcw.copyTo(Tcw.rowRange(0,3).col(3));
-            mCurrentFrame.SetPose(Tcw);
+            mCurrentFrame.SetPose(Tcw); 
 
             CreateInitialMapMonocular();
         }
@@ -1159,9 +1160,9 @@ void Tracking::CreateInitialMapMonocular()
     for(size_t i=0; i<mvIMUSinceLastKF.size(); i++)
     {
         IMUData imu = mvIMUSinceLastKF[i];
-        if(imu._t < mInitialFrame.mTimeStamp)//这里应该是不成立的。因为在得到第一个初始化的有效帧时，清楚了该有效帧之前的所有数据
+        if(imu._t < mInitialFrame.mTimeStamp)//这里是不成立的。因为在得到第一个初始化的有效帧时，清楚了该有效帧对应的IMU数据
             vimu1.push_back(imu);
-        else
+        else //always here
             vimu2.push_back(imu);
     }
     std::cout <<"vimu1.size "<<vimu1.size() <<std::endl;
@@ -1172,7 +1173,7 @@ void Tracking::CreateInitialMapMonocular()
     pKFini->ComputePreInt();
     KeyFrame* pKFcur = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB,vimu2,pKFini);
 	//预积分计算
-	pKFcur->ComputePreInt();//计算两个关键帧之间的预积分数据
+	pKFcur->ComputePreInt();//关键帧之间的IMU预积分
     // Clear IMUData buffer
    
     mvIMUSinceLastKF.clear(); //预积分之后，清零关键帧之前的IMU数据

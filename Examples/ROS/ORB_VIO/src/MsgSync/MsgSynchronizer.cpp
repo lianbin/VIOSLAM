@@ -8,7 +8,7 @@ MsgSynchronizer::MsgSynchronizer(const double& imagedelay):
     _imageMsgDelaySec(imagedelay), _status(NOTINIT),
     _dataUnsyncCnt(0)
 {
-    printf("image delay set as %.1fms\n",_imageMsgDelaySec*1000);
+    printf("image delay set as %.1fms\n",_imageMsgDelaySec*1000);//秒->毫秒
 }
 
 MsgSynchronizer::~MsgSynchronizer()
@@ -43,10 +43,11 @@ bool MsgSynchronizer::getRecentMsgs(sensor_msgs::ImageConstPtr &imgmsg, std::vec
         sensor_msgs::ImuConstPtr bmsg;
 
         //
-        imsg = _imageMsgQueue.back(); //最后一个push进去的数据
-        bmsg = _imuMsgQueue.front();  //imu的第一个数据（第一个push进去的数据）
+        imsg = _imageMsgQueue.back(); //最新的image
+        bmsg = _imuMsgQueue.front();  //最老的imu
 
         // Check dis-continuity, tolerance 3 seconds
+        //IMU数据超前image数据3秒以上，清空缓存数据
         if(imsg->header.stamp.toSec()-_imageMsgDelaySec + 3.0 < bmsg->header.stamp.toSec() )
         {
             ROS_ERROR("Data dis-continuity, > 3 seconds. Buffer cleared");
@@ -55,8 +56,8 @@ bool MsgSynchronizer::getRecentMsgs(sensor_msgs::ImageConstPtr &imgmsg, std::vec
         }
 
         //
-        imsg = _imageMsgQueue.front();//第一个image
-        bmsg = _imuMsgQueue.back();   //最后一个imu
+        imsg = _imageMsgQueue.front();//最老的image
+        bmsg = _imuMsgQueue.back();   //最新的imu
 
         // Wait imu messages in case communication block
         if(imsg->header.stamp.toSec()-_imageMsgDelaySec > bmsg->header.stamp.toSec())
@@ -65,6 +66,7 @@ bool MsgSynchronizer::getRecentMsgs(sensor_msgs::ImageConstPtr &imgmsg, std::vec
         }
 
         // Check dis-continuity, tolerance 3 seconds
+        //这个判断如果满足，则一定满足上一个判断，所以找个判断应该没有用
         if(imsg->header.stamp.toSec()-_imageMsgDelaySec > bmsg->header.stamp.toSec() + 3.0)
         {
             ROS_ERROR("Data dis-continuity, > 3 seconds. Buffer cleared");
@@ -73,7 +75,7 @@ bool MsgSynchronizer::getRecentMsgs(sensor_msgs::ImageConstPtr &imgmsg, std::vec
         }
 
         // Wait until the imu packages totolly com
-        // 注意这里 ，图像帧要大于10个 imu的帧数要大于15个
+        // 图像帧是一定小于10个的，因为buffer就开了2个
         if(_imageMsgQueue.size()<10 && _imuMsgQueue.size()<15
            && imsg->header.stamp.toSec()-_imageMsgDelaySec>bmsg->header.stamp.toSec() )
         {
@@ -85,8 +87,8 @@ bool MsgSynchronizer::getRecentMsgs(sensor_msgs::ImageConstPtr &imgmsg, std::vec
     }
 
     // get image message
-    imgmsg = _imageMsgQueue.front();//拿到第一幅图像
-    _imageMsgQueue.pop();           //将第一幅图像pop出去
+    imgmsg = _imageMsgQueue.front();//取最老的图像
+    _imageMsgQueue.pop();           
 
     // clear imu message vector, and push all imu messages whose timestamp is earlier than image message
     vimumsgs.clear();
@@ -175,9 +177,9 @@ void MsgSynchronizer::addImageMsg(const sensor_msgs::ImageConstPtr &imgmsg)
 {
     unique_lock<mutex> lock(_mutexImageQueue);
 
-    if(_imageMsgDelaySec >= 0) {
+    if(_imageMsgDelaySec >= 0) {//图像数据延后与IMU数据
         // if there's no imu messages, don't add image
-        if(_status == NOTINIT)//如果还没有imu数据，则图像数据也不接收
+        if(_status == NOTINIT)//图像数据延后的情况下，必然是先产生IMU数据，所以没有IMU数据，则图像数据也舍弃。
             return;
         else if(_status == INIT)
         {
@@ -196,7 +198,7 @@ void MsgSynchronizer::addImageMsg(const sensor_msgs::ImageConstPtr &imgmsg)
             _imageMsgQueue.push(imgmsg);
         }
     }
-    else {  // start by image message
+    else {  // start by image message ,delay <0 则图像数据先产生，应该根据图像数据进行初始化
         if(_status == NOTINIT)
         {
             _imuMsgTimeStart = imgmsg->header.stamp;
