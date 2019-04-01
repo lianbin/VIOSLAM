@@ -2298,8 +2298,7 @@ int Optimizer::PoseOptimization(Frame *pFrame, KeyFrame* pLastKF, const IMUPrein
     pFrame->UpdatePoseFromNS(ConfigParam::GetMatTbc());
 
     // Compute marginalized Hessian H and B, H*x=B, H/B can be used as prior for next optimization in PoseOptimization
-    //白巧克力
-    //H是求解的信息矩阵。最小二乘的时候，我们目标是使得误差的一阶导数为0嘛，
+    //H是求解的信息矩阵。最小二乘的时候，我们目标是使得误差的一阶导数为0，
     //而H又是一阶雅克比组成的，所以在不断迭代过程中，
     //H的大小和误差的残差有关系。就能用来当做你求解的这个位姿准不准的先验。g2o的论文里大致描述过一些。
 	if(bComputeMarg)

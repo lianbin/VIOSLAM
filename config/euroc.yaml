@@ -22,7 +22,7 @@ test.DiscardTime: 0
 #bagfile: "/media/jp/JingpangPassport/3dataset/EuRoC-VIO/un_restamped/MH_04_difficult.bag"
 #bagfile: "/media/jp/JingpangPassport/3dataset/EuRoC-VIO/un_restamped/MH_05_difficult.bag"
 #bagfile: "/media/jp/JingpangPassport/3dataset/EuRoC-VIO/un_restamped/MH_02_easy.bag"
-bagfile: "/media/jp/JingpangPassport/3dataset/EuRoC-VIO/un_restamped/MH_01_easy.bag"
+bagfile:  "/home/xp-lb/smb/EurocData/MH_01_easy.bag"
 #bagfile: "/media/jp/JingpangPassport/3dataset/EuRoC-VIO/un_restamped/V2_02_medium.bag"
 #bagfile: "/media/jp/JingpangPassport/3dataset/EuRoC-VIO/un_restamped/V2_01_easy.bag"
 #bagfile: "/media/jp/JingpangPassport/3dataset/EuRoC-VIO/un_restamped/V1_02_medium.bag"
